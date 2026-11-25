@@ -3,6 +3,9 @@ import type { Resolvers } from "@/generated/graphql/resolvers";
 import { maskPhone } from "@/shared/phone";
 import { adminServices } from "./support";
 
+// Neither `createOrganisation` nor `acceptMembership` is counted against a
+// Throttle yet: the Throttle port (spec §3) arrives with the sign-in slice, with
+// a per-account cap on organisations. The invitation token is 256 bits.
 export const organisationResolvers: Resolvers = {
   Viewer: {
     organisations: async (viewer, _, ctx) => {

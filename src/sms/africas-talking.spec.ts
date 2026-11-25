@@ -71,4 +71,11 @@ describe("africasTalkingSmsSender", () => {
     expect(error).toBeInstanceOf(SmsSendError);
     expect((error as SmsSendError).retryable).toBe(true);
   });
+
+  test("an answer that is no JSON is a retryable error, not a bare SyntaxError", async () => {
+    const { send } = sender(() => new Response("<html>", { status: 200 }));
+    const error = await send(message).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SmsSendError);
+    expect((error as SmsSendError).retryable).toBe(true);
+  });
 });

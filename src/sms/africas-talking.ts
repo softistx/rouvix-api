@@ -54,9 +54,14 @@ export function africasTalkingSmsSender(
           response.status >= 500 || response.status === 429,
         );
       }
-      const answer = (await response.json()) as {
-        SMSMessageData?: { Recipients?: { status?: string }[] };
-      };
+      let answer: { SMSMessageData?: { Recipients?: { status?: string }[] } };
+      try {
+        answer = (await response.json()) as typeof answer;
+      } catch (cause) {
+        throw new SmsSendError("Africa's Talking answered no JSON", true, {
+          cause,
+        });
+      }
       const status = answer.SMSMessageData?.Recipients?.[0]?.status;
       if (status !== "Success" && status !== "Sent") {
         throw new SmsSendError(

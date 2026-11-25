@@ -125,3 +125,9 @@ export interface CatalogueView {
   language: string;
   version: string;
 }
+
+// The language a `Language` argument names (`FR` is `fr`), or the request's.
+export const languageOf = (
+  argument: string | null | undefined,
+  requested: string,
+): string => argument?.toLowerCase() ?? requested;
