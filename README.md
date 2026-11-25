@@ -36,12 +36,12 @@ bun run dev                          # http://localhost:3000/graphql
 bun run admin:create "+237 6 00 00 00 01" --name Owner   # the first platform admin
 ```
 
-| Script | |
-| --- | --- |
-| `bun run verify` | generate, `schema:print --check`, Biome, `bun check`, tests: the green bar |
-| `bun run generate` | resolvers' types, the inputs' Zod schemas, the typed e2e client |
-| `bun run schema:print` | rewrites `schema.graphql` (commit it) |
-| `bun run db:sync`, `bun run db:migrate` | the deployment steps, in that order |
-| `bun run fix` | Biome, fixing format |
+| Script                                  |                                                                            |
+| --------------------------------------- | -------------------------------------------------------------------------- |
+| `bun run verify`                        | generate, `schema:print --check`, Biome, `bun check`, tests: the green bar |
+| `bun run generate`                      | resolvers' types, the inputs' Zod schemas, the typed e2e client            |
+| `bun run schema:print`                  | rewrites `schema.graphql` (commit it)                                      |
+| `bun run db:sync`, `bun run db:migrate` | the deployment steps, in that order                                        |
+| `bun run fix`                           | Biome, fixing format                                                       |
 
 `bun test` needs no service: it starts an in-memory MongoDB replica set.
