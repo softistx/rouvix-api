@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   catalogueOf,
   errorParams,
+  languageOf,
   messageIn,
   messagesOf,
   stableJson,
@@ -74,5 +75,13 @@ describe("errorParams", () => {
       { name: "day", kind: "DATE" },
     ]);
     expect(errorParams("Rien.")).toEqual([]);
+  });
+});
+
+describe("languageOf", () => {
+  test("is the language an argument names, lower case, else the request's", () => {
+    expect(languageOf("EN", "fr")).toBe("en");
+    expect(languageOf(null, "fr")).toBe("fr");
+    expect(languageOf(undefined, "en")).toBe("en");
   });
 });

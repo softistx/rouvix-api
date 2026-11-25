@@ -1,4 +1,3 @@
-import type { ObjectId } from "mongodb";
 import type { Context } from "@/http/context";
 import { fail } from "@/shared/errors";
 
@@ -48,13 +47,6 @@ export async function requireOrgAdmin(ctx: GuardContext, slug: string) {
   }
   return found;
 }
-
-// Whether the viewer administers the organisation, for what a flag needs after
-// `requireOrgAgent` has refused whoever may not even read. Refuses nothing.
-export const isAdminOf = (
-  ctx: Pick<GuardContext, "viewer" | "access">,
-  organisationId: ObjectId,
-) => ctx.access.isOrgAdmin(requireUser(ctx), organisationId);
 
 // The viewer, when the platform named them a moderator (a platform admin is
 // one): requireUser's refusals, then 403.

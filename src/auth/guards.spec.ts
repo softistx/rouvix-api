@@ -3,7 +3,6 @@ import { ObjectId } from "mongodb";
 import { refusal } from "~/refusals";
 import type { Access, Viewer } from "./access";
 import {
-  isAdminOf,
   requireModerator,
   requireOrgAdmin,
   requireOrgAgent,
@@ -100,7 +99,6 @@ describe("requireOrgAgent and requireOrgAdmin", () => {
     expect((await requireOrgAdmin(admin, "mairie")).organisation).toBe(
       organisation as never,
     );
-    expect(await isAdminOf(admin, organisation._id)).toBe(true);
   });
 
   test("an anonymous request is a 401 before the organisation is read", async () => {
