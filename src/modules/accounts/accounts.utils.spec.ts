@@ -4,7 +4,7 @@ import { countryOf, rolesOf } from "./accounts.utils";
 describe("countryOf", () => {
   test("reads Cameroon from +237 and nothing from an unserved dial code", () => {
     expect(countryOf("+237600000001")).toBe("CM");
-    expect(countryOf("+33612345678")).toBeNull();
+    expect(countryOf("+33600000078")).toBeNull();
   });
 });
 

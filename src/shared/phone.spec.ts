@@ -25,9 +25,9 @@ describe("maskPhone", () => {
   });
 
   test("masks every middle digit of any number, and never shows the whole of it", () => {
-    const masked = maskPhone("+33612345678");
+    const masked = maskPhone("+33600000078");
     expect(masked.endsWith("78")).toBe(true);
-    expect(masked).not.toContain("12345");
-    expect(masked.length).toBe("+33612345678".length);
+    expect(masked).not.toContain("0000");
+    expect(masked.length).toBe("+33600000078".length);
   });
 });

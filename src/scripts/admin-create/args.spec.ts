@@ -10,9 +10,9 @@ describe("parseArgs", () => {
 
   test("takes --name and --country, in any order", () => {
     expect(
-      parseArgs(["--country", "fr", "+33 6 12 34 56 78", "--name", " Owner "]),
+      parseArgs(["--country", "fr", "+33 6 00 00 00 78", "--name", " Owner "]),
     ).toEqual({
-      args: { phone: "+33612345678", name: "Owner", countryCode: "FR" },
+      args: { phone: "+33600000078", name: "Owner", countryCode: "FR" },
     });
   });
 

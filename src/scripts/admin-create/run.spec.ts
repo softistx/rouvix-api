@@ -46,7 +46,7 @@ describe("adminCreate", () => {
   });
 
   test("a number of an unserved country is refused, exit 1", async () => {
-    expect(await adminCreate(["+33612345678"], accounts, log)).toBe(1);
+    expect(await adminCreate(["+33600000078"], accounts, log)).toBe(1);
     expect(lines[0]).toContain("accounts.errors.unknown-country");
   });
 });

@@ -54,11 +54,11 @@ describe("ensurePlatformAdmin", () => {
 
   test("a number of an unserved country needs --country, else is refused", async () => {
     const error = await refusal(
-      accounts.ensurePlatformAdmin({ phone: "+33612345678", name: "Admin" }),
+      accounts.ensurePlatformAdmin({ phone: "+33600000078", name: "Admin" }),
     );
     expect(error.extensions["code"]).toBe("accounts.errors.unknown-country");
     const made = await accounts.ensurePlatformAdmin({
-      phone: "+33612345678",
+      phone: "+33600000078",
       name: "Admin",
       countryCode: "FR",
     });
