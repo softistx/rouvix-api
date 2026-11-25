@@ -1,0 +1,65 @@
+import { describe, expect, test } from "bun:test";
+
+// src/config/env.ts is checked once, at import: each case re-imports it under
+// its own environment.
+async function parsed(vars: Record<string, string | undefined>) {
+  const saved = { ...Bun.env };
+  try {
+    for (const [name, value] of Object.entries(vars)) {
+      if (value === undefined) delete Bun.env[name];
+      else Bun.env[name] = value;
+    }
+    return await import(`./env?case=${Math.random()}`);
+  } finally {
+    for (const name of Object.keys(vars)) {
+      const old = saved[name];
+      if (old === undefined) delete Bun.env[name];
+      else Bun.env[name] = old;
+    }
+  }
+}
+
+describe("env", () => {
+  test("outside production, the log SMS adapter and the console mailer stand in", async () => {
+    const { env } = await parsed({
+      SMS_PROVIDER: undefined,
+      MAIL_URL: undefined,
+    });
+    expect(env.SMS_PROVIDER).toBe("log");
+    expect(env.MAIL_URL).toBeUndefined();
+    expect(env.REDIS_URL).toBeUndefined();
+    expect(env.AT_BASE_URL).toBe("https://api.africastalking.com");
+  });
+
+  test("Africa's Talking needs its username and key", async () => {
+    await expect(
+      parsed({
+        SMS_PROVIDER: "africastalking",
+        AT_USERNAME: undefined,
+        AT_API_KEY: undefined,
+      }),
+    ).rejects.toThrow();
+    const { env } = await parsed({
+      SMS_PROVIDER: "africastalking",
+      AT_USERNAME: "sandbox",
+      AT_API_KEY: "key",
+      AT_BASE_URL: "https://api.sandbox.africastalking.com/",
+    });
+    expect(env.AT_BASE_URL).toBe("https://api.sandbox.africastalking.com");
+  });
+
+  test("PROXY_SECRET and TRUSTED_PROXIES exclude each other, and a short secret is refused", async () => {
+    await expect(
+      parsed({ PROXY_SECRET: "x".repeat(32), TRUSTED_PROXIES: "10.0.0.0/8" }),
+    ).rejects.toThrow("choose one");
+    await expect(
+      parsed({ PROXY_SECRET: "short", TRUSTED_PROXIES: undefined }),
+    ).rejects.toThrow();
+  });
+
+  test("a malformed variable stops the process with the variable named", async () => {
+    await expect(parsed({ MONGO_URI: "http://nope" })).rejects.toThrow();
+    await expect(parsed({ REDIS_URL: "nope" })).rejects.toThrow();
+    await expect(parsed({ TRUSTED_PROXIES: "not-a-range" })).rejects.toThrow();
+  });
+});

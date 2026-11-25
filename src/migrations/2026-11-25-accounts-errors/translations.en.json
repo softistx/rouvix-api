@@ -1,0 +1,4 @@
+{
+  "accounts.errors.suspended": "This account is suspended. Contact support if you think this is a mistake.",
+  "accounts.errors.unknown-country": "The country of the number {prefix}… is not supported."
+}

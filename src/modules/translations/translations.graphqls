@@ -1,0 +1,62 @@
+"""
+The API's error messages in one language, for a client that words refusals itself.
+A refusal carries `extensions.code` and `extensions.params`; the client finds the
+code in `messages`, and fills the message with the params (ICU: `{name}`,
+`{count, plural, one {…} other {…}}`). The params stay raw. Cache a catalogue per
+language by `version`.
+"""
+type ErrorCatalogue {
+  language: Language!
+  """
+  Changes whenever a text of the language's catalogue, or of French's which fills
+  it, changes (a deploy that adds or rewords one), and it is the same after a
+  restart. Selecting it alone reads no message.
+  """
+  version: String!
+  "Every error code in code order, each in the language or, where it has no text, in French (the fallback)."
+  messages: [ErrorMessage!]! @listSize(assumedSize: 100)
+}
+
+type ErrorMessage {
+  "`<module>.errors.<slug>`: the `extensions.code` the API answers."
+  code: String!
+  "The ICU message, uninterpolated, that `extensions.params` fill."
+  message: String!
+  "The arguments the message names, each once per kind, in order of appearance: what a client has to supply, without parsing the ICU itself."
+  params: [ErrorParam!]! @listSize(assumedSize: 5)
+}
+
+"One argument of an error message."
+type ErrorParam {
+  "The name `extensions.params` gives it."
+  name: String!
+  kind: ErrorParamKind!
+}
+
+"How a message uses an argument."
+enum ErrorParamKind {
+  "`{name}`: inserted as it is."
+  TEXT
+  "`{count, number}`."
+  NUMBER
+  "`{day, date, long}`."
+  DATE
+  "`{count, plural, one {…} other {…}}`: a number."
+  PLURAL
+  "`{role, select, a {…} other {…}}`: one of the arms' keys, as text."
+  SELECT
+}
+
+extend type Query {
+  """
+  Every API error message in a language (the request's language when none is
+  given: `Accept-Language`, then `lang`, then the cookie, else French). Public:
+  sign-in screens need it, so no viewer is asked for.
+  """
+  errorCatalogue(language: Language): ErrorCatalogue!
+  """
+  The `version` of `errorCatalogue(language)`, a cheap read to revalidate a
+  cached catalogue. Public.
+  """
+  errorCatalogueVersion(language: Language): String!
+}

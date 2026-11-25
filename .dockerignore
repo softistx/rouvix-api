@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+.env.local
+.git
+**/*.spec.ts
+deploy/.env
+deploy/*.env

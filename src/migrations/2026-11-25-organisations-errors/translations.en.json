@@ -1,0 +1,9 @@
+{
+  "organisations.errors.organisation-not-found": "This organisation could not be found.",
+  "organisations.errors.member-not-found": "This member could not be found in this organisation.",
+  "organisations.errors.slug-taken": "The address \"{slug}\" is already taken by another organisation.",
+  "organisations.errors.already-member": "This number is already a member of the organisation.",
+  "organisations.errors.invitation-invalid": "This invitation is invalid, expired or meant for another number.",
+  "organisations.errors.last-admin": "The organisation must keep at least one administrator.",
+  "organisations.errors.stale-version": "The organisation changed at the same time. Try again."
+}

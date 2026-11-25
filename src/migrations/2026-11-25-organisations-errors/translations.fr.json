@@ -1,0 +1,9 @@
+{
+  "organisations.errors.organisation-not-found": "Cette organisation est introuvable.",
+  "organisations.errors.member-not-found": "Ce membre est introuvable dans cette organisation.",
+  "organisations.errors.slug-taken": "L'adresse « {slug} » est déjà prise par une autre organisation.",
+  "organisations.errors.already-member": "Ce numéro est déjà membre de l'organisation.",
+  "organisations.errors.invitation-invalid": "Cette invitation est invalide, expirée ou destinée à un autre numéro.",
+  "organisations.errors.last-admin": "L'organisation doit garder au moins un administrateur.",
+  "organisations.errors.stale-version": "L'organisation a changé en même temps. Réessayez."
+}
