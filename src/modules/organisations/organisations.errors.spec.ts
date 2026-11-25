@@ -8,6 +8,7 @@ import {
   locked,
   memberNotFound,
   organisationNotFound,
+  slugReserved,
   slugTaken,
   staleVersion,
 } from "./organisations.errors";
@@ -21,6 +22,7 @@ describe("codes", () => {
       "organisations.errors.organisation-not-found",
       "organisations.errors.member-not-found",
       "organisations.errors.slug-taken",
+      "organisations.errors.slug-reserved",
       "organisations.errors.already-member",
       "organisations.errors.invitation-invalid",
       "organisations.errors.last-admin",
@@ -41,6 +43,13 @@ describe("refusals", () => {
     expect(error.extensions["code"]).toBe("organisations.errors.slug-taken");
     expect(statusOf(error)).toEqual({ status: 409 });
     expect(error.extensions["params"]).toEqual({ slug: "mairie" });
+    expect(error.extensions["fields"]).toMatchObject([{ path: "slug" }]);
+  });
+
+  test("a reserved slug is 400 on `slug`, with the slug as a param", () => {
+    const error = slugReserved("settings");
+    expect(error.extensions["code"]).toBe("organisations.errors.slug-reserved");
+    expect(statusOf(error)).toEqual({ status: 400 });
     expect(error.extensions["fields"]).toMatchObject([{ path: "slug" }]);
   });
 

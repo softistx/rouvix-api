@@ -2,6 +2,7 @@ import type { Migration } from "@softistx/mongo/migrations";
 import { accountsErrors } from "./2026-11-25-accounts-errors.migration";
 import { initialCatalogues } from "./2026-11-25-initial-catalogues.migration";
 import { organisationsErrors } from "./2026-11-25-organisations-errors.migration";
+import { slugReserved } from "./2026-11-25-slug-reserved.migration";
 
 // The migrations `bun run db:migrate` applies, in EXECUTION order: the only
 // thing `migrate`, `rollback` and the boot check read. A new migration is
@@ -14,4 +15,5 @@ export const migrations: readonly Migration[] = [
   initialCatalogues,
   accountsErrors,
   organisationsErrors,
+  slugReserved,
 ];

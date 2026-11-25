@@ -1,0 +1,3 @@
+{
+  "organisations.errors.slug-reserved": "The address \"{slug}\" is reserved: pick another one."
+}

@@ -6,8 +6,9 @@ import type { AppMongo } from "@/config/db";
 import { retryWriteConflicts } from "@/shared/locked";
 import { scoped } from "@/tenancy";
 import type { OrganisationKind, organisations } from "../models";
-import { slugTaken, staleVersion } from "../organisations.errors";
+import { slugReserved, slugTaken, staleVersion } from "../organisations.errors";
 import type { OrganisationRelations } from "../organisations.janus";
+import { isReservedSlug } from "../organisations.rules";
 
 export type OrganisationDocument = ReadDocumentOf<typeof organisations>;
 
@@ -36,6 +37,7 @@ export class OrganisationsService {
   // its first administrator's relation granted next, the documents written in
   // one transaction last; whatever fails after the grant undoes it.
   async create(viewer: Viewer, input: CreateOrganisationInput) {
+    if (isReservedSlug(input.slug)) throw slugReserved(input.slug);
     if (await this.bySlug(input.slug)) throw slugTaken(input.slug);
     const _id = new ObjectId();
     await this.relations.hold(_id, viewer.id, "ADMIN");

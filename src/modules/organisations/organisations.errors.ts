@@ -9,6 +9,7 @@ export const codes = defineCodes("organisations", [
   "organisation-not-found",
   "member-not-found",
   "slug-taken",
+  "slug-reserved",
   "already-member",
   "invitation-invalid",
   "last-admin",
@@ -36,6 +37,20 @@ export const slugTaken = (slug: string) =>
       },
     ],
     { status: 409, params: { slug } },
+  );
+
+// A slug that is one of the UI's own top-level routes (`reservedSlugs`).
+export const slugReserved = (slug: string) =>
+  failOnFields(
+    "organisations.errors.slug-reserved",
+    [
+      {
+        path: "slug",
+        code: "organisations.errors.slug-reserved",
+        params: { slug },
+      },
+    ],
+    { status: 400, params: { slug } },
   );
 
 // The phone is already invited or a member of the organisation.

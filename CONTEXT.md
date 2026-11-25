@@ -44,15 +44,16 @@ changes meaning: a new case gets a new code.
 
 Field codes: raised in `extensions.fields` beside the top-level code of the call.
 
-| Code                                  | Input path                     | When                                                     |
-| ------------------------------------- | ------------------------------ | -------------------------------------------------------- |
-| `organisations.errors.slug-taken`     | `slug` of `createOrganisation` | Another organisation holds the slug (409, `slug` param). |
-| `organisations.errors.already-member` | `phone` of `inviteMember`      | The phone is already an active member (409).             |
-| `validation.errors.invalid-format`    | `phone` of `inviteMember`      | Not an international number (`+` and 8 to 15 digits).    |
-| `validation.errors.required`          | any                            | A field that must be given.                              |
-| `validation.errors.invalid`           | any                            | A value the schema refuses.                              |
-| `validation.errors.too-short`         | any `@constraint(minLength)`   | A string under its minimum.                              |
-| `validation.errors.too-long`          | any `@constraint(maxLength)`   | A string over its maximum.                               |
-| `validation.errors.out-of-range`      | any `@constraint(min, max)`    | A number outside its range.                              |
-| `validation.errors.too-few`           | any `@constraint(minItems)`    | A list under its minimum.                                |
-| `validation.errors.too-many`          | any `@constraint(maxItems)`    | A list over its maximum.                                 |
+| Code                                  | Input path                     | When                                                                                                 |
+| ------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `organisations.errors.slug-reserved`  | `slug` of `createOrganisation` | The slug is one of the UI's own top-level routes or one of the platform's words (400, `slug` param). |
+| `organisations.errors.slug-taken`     | `slug` of `createOrganisation` | Another organisation holds the slug (409, `slug` param).                                             |
+| `organisations.errors.already-member` | `phone` of `inviteMember`      | The phone is already an active member (409).                                                         |
+| `validation.errors.invalid-format`    | `phone` of `inviteMember`      | Not an international number (`+` and 8 to 15 digits).                                                |
+| `validation.errors.required`          | any                            | A field that must be given.                                                                          |
+| `validation.errors.invalid`           | any                            | A value the schema refuses.                                                                          |
+| `validation.errors.too-short`         | any `@constraint(minLength)`   | A string under its minimum.                                                                          |
+| `validation.errors.too-long`          | any `@constraint(maxLength)`   | A string over its maximum.                                                                           |
+| `validation.errors.out-of-range`      | any `@constraint(min, max)`    | A number outside its range.                                                                          |
+| `validation.errors.too-few`           | any `@constraint(minItems)`    | A list under its minimum.                                                                            |
+| `validation.errors.too-many`          | any `@constraint(maxItems)`    | A list over its maximum.                                                                             |

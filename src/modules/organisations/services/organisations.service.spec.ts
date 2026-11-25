@@ -82,6 +82,16 @@ describe("create", () => {
   });
 });
 
+describe("reserved slugs", () => {
+  test("a slug that is a UI route is refused before anything is granted", async () => {
+    const viewer = await viewerAt(1);
+    const error = await refusal(service.create(viewer, input("settings")));
+    expect(error.extensions["code"]).toBe("organisations.errors.slug-reserved");
+    expect(await service.ofViewer(viewer)).toEqual([]);
+    expect(await mongo.db.organisations.count({})).toBe(0);
+  });
+});
+
 describe("bySlug and ofViewer", () => {
   test("finds an organisation by slug, and none by a wrong one", async () => {
     await service.create(await viewerAt(1), input("mairie"));
