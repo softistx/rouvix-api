@@ -123,7 +123,7 @@ extend type Query {
 type Mutation {
   """
   Makes an organisation, its creator becoming its administrator. Needs a signed-in,
-  unsuspended account. Refusals: `organisations.errors.slug-taken` (409, on `slug`).
+  unsuspended account. Refusals: `organisations.errors.slug-reserved` (400, on `slug`: the slug is one of the UI's own routes), `organisations.errors.slug-taken` (409, on `slug`).
   """
   createOrganisation(input: CreateOrganisationInput!): Organisation!
   """

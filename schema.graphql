@@ -360,7 +360,7 @@ type Mutation {
   acceptMembership(token: String! @constraint(minLength: 40, maxLength: 128)): OrganisationMembership!
   """
   Makes an organisation, its creator becoming its administrator. Needs a signed-in,
-  unsuspended account. Refusals: `organisations.errors.slug-taken` (409, on `slug`).
+  unsuspended account. Refusals: `organisations.errors.slug-reserved` (400, on `slug`: the slug is one of the UI's own routes), `organisations.errors.slug-taken` (409, on `slug`).
   """
   createOrganisation(input: CreateOrganisationInput!): Organisation!
   """
