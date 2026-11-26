@@ -23,6 +23,13 @@ describe("publicPhotoKeys", () => {
 });
 
 describe("closingPhotos", () => {
+  test("an object's photo never checked goes too: it could be an ID's", () => {
+    const pending = { ...plain, status: "PENDING" as const };
+    expect(
+      closingPhotos({ documentType: null, photos: [pending] }).gone,
+    ).toEqual([pending]);
+  });
+
   test("a document's all go, an object's ID-like ones only", () => {
     expect(
       closingPhotos({ documentType: "CNI", photos: [plain, idLike] }),

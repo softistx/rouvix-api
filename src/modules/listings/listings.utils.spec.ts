@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import {
   addDays,
   blurredKeysOf,
+  blurredObjectKey,
   blurredPoint,
   cityKeyOf,
   dateString,
   dayOf,
   dayOfString,
+  droppedKeysOf,
   objectKeysOf,
   publicPoint,
   sameItems,
@@ -145,5 +147,14 @@ describe("the photo helpers", () => {
     expect(sameItems([a], [{ ...a }])).toBe(true);
     expect(sameItems([a], [{ ...a, blurredKey: B1 }])).toBe(false);
     expect(sameItems([a], [])).toBe(false);
+  });
+
+  test("droppedKeysOf names the renditions of the dropped photos, blurredObjectKey a copy", () => {
+    const checks = new Map([
+      [K1, { outcome: "DROPPED" as const }],
+      [K2, { outcome: "READY" as const }],
+    ]);
+    expect(droppedKeysOf(checks)).toEqual([`listing-photos/${K1}/full`]);
+    expect(blurredObjectKey(B1)).toBe(`listing-blurred/${B1}`);
   });
 });

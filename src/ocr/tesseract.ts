@@ -37,6 +37,8 @@ export function tesseractOcr(options: TesseractOptions): Ocr {
             accept: "text/tab-separated-values",
           },
           body: png as BodyInit,
+          // A sidecar that redirects could send the photo elsewhere.
+          redirect: "error",
           signal: AbortSignal.timeout(timeoutMs),
         });
       } catch (error) {

@@ -38,13 +38,17 @@ export const processesAgain = (
   (listing.documentType !== null && removesPhotos);
 
 // The photos a closing listing keeps and those it removes: an ID document's
-// all go, an object's ID-like ones (those with a blurred copy) too.
+// all go, an object's ID-like ones (those with a blurred copy) too, and those
+// never checked yet (still pending: they could be an ID's).
 export function closingPhotos(listing: {
   documentType: string | null;
   photos: readonly ListingPhoto[];
 }) {
   const gone = listing.photos.filter(
-    (photo) => listing.documentType !== null || photo.blurredKey !== null,
+    (photo) =>
+      listing.documentType !== null ||
+      photo.blurredKey !== null ||
+      photo.status === "PENDING",
   );
   return {
     kept: listing.photos.filter((photo) => !gone.includes(photo)),

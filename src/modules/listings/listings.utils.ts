@@ -191,12 +191,34 @@ export const blurredKeysOf = (
     typeof item.blurredKey === "string" ? [item.blurredKey] : [],
   );
 
+// What the photo job may still settle: a listing being published or public.
+// Any other (closed, expired, removed) took its ID photos with it.
+export const SETTLING_STATUSES: readonly ListingStatus[] = [
+  "PENDING",
+  "OPEN",
+  "CLAIMED",
+];
+
+// The bucket object of a blurred copy.
+export const blurredObjectKey = (key: string) =>
+  mediaObjectKey(BLURRED_KIND, key);
+
+// The bucket objects (renditions) of the photos the job dropped.
+export const droppedKeysOf = (
+  checks: ReadonlyMap<string, { outcome: "DROPPED" | "READY" }>,
+): string[] =>
+  [...checks].flatMap(([key, check]) =>
+    check.outcome === "DROPPED"
+      ? [mediaObjectKey(PHOTO_KIND, key, PHOTO_FULL)]
+      : [],
+  );
+
 // The bucket objects of photos: each one's rendition and its blurred copy.
 export const objectKeysOf = (
   photos: readonly Pick<ListingPhoto, "key" | "blurredKey">[],
 ): string[] => [
   ...photos.map((photo) => mediaObjectKey(PHOTO_KIND, photo.key, PHOTO_FULL)),
-  ...blurredKeysOf(photos).map((key) => mediaObjectKey(BLURRED_KIND, key)),
+  ...blurredKeysOf(photos).map(blurredObjectKey),
 ];
 
 // Whether two lists of photos say the same, photo by photo.

@@ -35,7 +35,9 @@ plugin's (`build-an-alxia-graphql-api`, `add-a-module`, its `conventions-reviewe
 `src/` has the entry points at its root (`server.ts`, `app.ts`, its spec) and a folder per
 concern: `config` (env, db, redis, sms, auth), `http` (context, schema, csrf, limits),
 `auth` (`auth.ts` janus, `access.ts`, `guards.ts`), `tenancy` (`scoped()`, the directory),
-`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder`, `throttle` and `storage` (the ports' adapters), `shared`,
+`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder`, `throttle`, `storage`, `ocr`
+(with the readers of OCR text: the zone, the ID-like check), `redactor` and `vault` (the ports'
+adapters), `shared`,
 `migrations` (with its `kit/`), `scripts` and `modules`. A module is `modules/<name>/`:
 flat for one entity, a folder per role (`graphql/`, `models/`, `services/`, `resolvers/`)
 for several, with `<name>.errors.ts` (+ spec), `.rules.ts`, `.utils.ts`, `.janus.ts` and an
@@ -68,7 +70,7 @@ of a service, a resolver or a data-loader: it goes to the module's `utils`, `rul
 
 ## Ports
 
-`SmsSender` (`src/sms`: the log adapter, Africa's Talking), `Mailer`, `Geocoder`, `Throttle` (`src/throttle`: Redis rate limits, fail open for visitor reads; `memoryThrottle` in `test/throttle.ts`), the search's `ListingRanker` (plain text ranking until slice 6's embeddings) and the photos' `MediaBucket` (`src/storage`) are passed explicitly
+`SmsSender` (`src/sms`: the log adapter, Africa's Talking), `Mailer`, `Geocoder`, `Throttle` (`src/throttle`: Redis rate limits, fail open for visitor reads; `memoryThrottle` in `test/throttle.ts`), the search's `ListingRanker` (plain text ranking until slice 6's embeddings) the photos' `MediaBucket` (`src/storage`), and the ID document pipeline's `Ocr` (`src/ocr`: the Tesseract sidecar of `docker/ocr`, its `OCR_URL` refused unless private; `fakeOcr` in `test/ocr.ts`), `ImageRedactor` (`src/redactor`: the whole photo blurred in process) and `IdVault` (`src/vault`: `ID_FIELDS_KEY`) are passed explicitly
 and never defaulted but by `createApp`, from the environment (`SMS_PROVIDER`; the log adapter is
 refused in production). A spec passes `memorySmsSender` (`test/sms.ts`) and the memory mailer.
 
@@ -119,8 +121,14 @@ is held in a SCREAMING_SNAKE_CASE constant. Assert `extensions.code`, never the 
 - **Masked by default**: `Query.listing` returns `PublicListing` only, for an open or claimed
   listing. No author, no question or answer, no phone, no original photo. A place is blurred to
   three decimals (about 110 m) unless the item is kept at a police station or an organisation. For
-  an ID document (`documentType` set) the free text, the attributes and the photos are withheld
-  until the OCR and blur slice. `listings.schema.spec.ts` fixes what a visitor can reach and
+  an ID document (`documentType` set) the free text and the attributes are withheld; it shows its
+  type, its country, the number masked but its first two characters (`maskedNumber`), the holder's
+  first name and last-name initial (`holderHint`) and its photos blurred whole (`blurredPhotoKeys`,
+  `/media/listing-blurred`). An object's photo the local OCR finds ID-like is shown blurred too. No
+  resolver returns `idFields` (sealed) or `idNumberHash`, to anyone; closing or removing the
+  listing deletes its ID photos, blurred copies and fields. `test/e2e/listings.id-leak.e2e.spec.ts`
+  and `listings.id-remote.e2e.spec.ts` hold it, and `RemotePhotoGuard` (`src/modules/ai`) is the
+  gate any call that would send a photo off the VPS goes through. `listings.schema.spec.ts` fixes what a visitor can reach and
   `test/e2e/listings.leak.e2e.spec.ts` reads it as text.
 - Photos go through `@softistx/alxia-media` (`/media/listing-photos`, `src/http/media.ts`): the
   only transport beside `/graphql`, over a private bucket (`S3_*`), a key never a URL, no presigned

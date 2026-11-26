@@ -179,7 +179,10 @@ export class ListingsService {
         version,
       });
       await this.deps.photos.discard(removed);
-      if (again) await this.deps.photos.discardBlurred(listing.photos);
+      if (again)
+        await this.deps.photos.discardBlurred(
+          listing.photos.filter((photo) => !removed.includes(photo)),
+        );
       this.settleLater(written);
       return written;
     });

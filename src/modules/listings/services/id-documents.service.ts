@@ -15,7 +15,7 @@ import { type ImageRedactor, RedactionError } from "@/redactor";
 import type { Now } from "@/shared/dates";
 import type { IdVault } from "@/vault";
 import { BLURRED_KIND, PHOTO_FULL, PHOTO_KIND } from "../listings.media";
-import { blurredKeysOf } from "../listings.utils";
+import { blurredKeysOf, droppedKeysOf } from "../listings.utils";
 import type { ListingPhoto } from "../models";
 import {
   type IdFields,
@@ -90,7 +90,8 @@ export class IdDocumentsService {
   // The listing once the checks are applied to the photos it still carries:
   // its photos, and for a document its sealed fields merged with those just
   // read, their hash and the public text. `orphans` are the blurred copies of
-  // photos the listing dropped meanwhile, for the caller to remove.
+  // photos the listing dropped meanwhile, `dropped` the renditions of photos
+  // the job dropped: both for the caller to remove.
   settled(listing: ListingDocument, checks: ReadonlyMap<string, PhotoCheck>) {
     const read: IdFields[] = [];
     const photos: ListingPhoto[] = [];
@@ -111,7 +112,14 @@ export class IdDocumentsService {
     const orphans = blurredKeysOf(checks.values()).filter(
       (key) => !kept.has(key),
     );
-    return { photos, orphans, ...this.fieldsOf(listing, read) };
+    // A dropped photo's rendition is removed too: nothing carries it now.
+    const pending = new Set(
+      listing.photos.filter((p) => p.status === "PENDING").map((p) => p.key),
+    );
+    const dropped = droppedKeysOf(
+      new Map([...checks].filter(([key]) => pending.has(key))),
+    );
+    return { photos, orphans, dropped, ...this.fieldsOf(listing, read) };
   }
 
   private fieldsOf(listing: ListingDocument, read: readonly IdFields[]) {

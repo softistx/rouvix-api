@@ -1,8 +1,14 @@
-import { type MediaBucket, mediaObjectKey } from "@softistx/alxia-media";
+import type { MediaBucket } from "@softistx/alxia-media";
 import type { AppMongo } from "@/config/db";
 import { locked } from "../listings.errors";
-import { BLURRED_KIND } from "../listings.media";
-import { blurredKeysOf, objectKeysOf, sameItems } from "../listings.utils";
+import {
+  blurredKeysOf,
+  blurredObjectKey,
+  droppedKeysOf,
+  objectKeysOf,
+  SETTLING_STATUSES,
+  sameItems,
+} from "../listings.utils";
 import type { ListingPhoto } from "../models";
 import type { IdDocumentsService } from "./id-documents.service";
 
@@ -32,14 +38,30 @@ export class PhotosService {
     const first = await this.mongo.db.listings.findById(listingId);
     if (first === undefined || first.status === "DRAFT") return;
     const checks = await this.documents.check(first);
-    const orphans = await locked(false, async () => {
+    const leftovers = await locked(false, async () => {
       const listing = await this.mongo.db.listings.findById(listingId);
-      if (listing === undefined) return blurredKeysOf(checks.values());
-      const { orphans, ...fields } = this.documents.settled(listing, checks);
+      // Gone, closed (its ID photos went with it), or its document type
+      // changed meanwhile (its photos were reset, and that update's own job
+      // checks them again): nothing applies, what the checks made is removed.
+      if (
+        listing === undefined ||
+        !SETTLING_STATUSES.includes(listing.status) ||
+        listing.documentType !== first.documentType
+      ) {
+        return [
+          ...blurredKeysOf(checks.values()).map(blurredObjectKey),
+          ...droppedKeysOf(checks),
+        ];
+      }
+      const { orphans, dropped, ...fields } = this.documents.settled(
+        listing,
+        checks,
+      );
+      const left = [...orphans.map(blurredObjectKey), ...dropped];
       const opens =
         listing.status === "PENDING" &&
         fields.photos.every((photo) => photo.status === "READY");
-      if (!opens && sameItems(fields.photos, listing.photos)) return orphans;
+      if (!opens && sameItems(fields.photos, listing.photos)) return left;
       await this.mongo.db.listings.update(listing._id, {
         ...fields,
         ...(opens && { status: "OPEN" as const }),
@@ -47,11 +69,9 @@ export class PhotosService {
         // close) makes this one read again instead of overwriting it.
         version: listing.version,
       });
-      return orphans;
+      return left;
     });
-    await this.discardObjects(
-      orphans.map((key) => mediaObjectKey(BLURRED_KIND, key)),
-    );
+    await this.discardObjects(leftovers);
   }
 
   // The job as the write starts it: a bucket that does not answer is tried
@@ -77,9 +97,7 @@ export class PhotosService {
 
   // Removes the blurred copies alone: photos whose ID processing starts over.
   async discardBlurred(photos: readonly Pick<ListingPhoto, "blurredKey">[]) {
-    await this.discardObjects(
-      blurredKeysOf(photos).map((key) => mediaObjectKey(BLURRED_KIND, key)),
-    );
+    await this.discardObjects(blurredKeysOf(photos).map(blurredObjectKey));
   }
 
   // Each object tried three times. One that still fails is logged and left

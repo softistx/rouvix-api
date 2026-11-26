@@ -146,5 +146,65 @@ describe("a photo the blur cannot decode", () => {
       status: "OPEN",
       photos: [],
     });
+    // Its rendition goes with it: nothing would carry it to a later removal.
+    expect(kit.storage.objects.size).toBe(0);
+  });
+});
+
+describe("a document type that changes while the job reads", () => {
+  test("applies nothing of the stale reads and removes their blurred copies", async () => {
+    kit.ocr.answer(["SAMSUNG"]);
+    const { me, listing } = await published(0, foundContent);
+    const key = await photoOf(kit, me.token);
+    await mongo.db.listings.update(listing._id, {
+      status: "PENDING",
+      photos: [{ key, status: "PENDING", blurredKey: null }],
+    });
+    const documents = idDocumentsOver(kit, kit.storage.bucket);
+    const check = documents.check.bind(documents);
+    // The update that makes it a document lands between the read and the write.
+    documents.check = async (first) => {
+      const checks = await check(first);
+      await mongo.db.listings.update(first._id, {
+        categoryKey: "DOCUMENT",
+        documentType: "CNI",
+      });
+      return checks;
+    };
+    await new PhotosService(mongo, kit.storage.bucket, documents).settle(
+      listing._id.toHexString(),
+    );
+    expect(await me.listings.find(listing._id.toHexString())).toMatchObject({
+      status: "PENDING",
+      photos: [{ key, status: "PENDING", blurredKey: null }],
+    });
+  });
+});
+
+describe("a listing closed while the job reads", () => {
+  test("keeps nothing the job made", async () => {
+    kit.ocr.answer(fakeCniLines());
+    const { me, listing } = await published(0, foundContent);
+    const key = await photoOf(kit, me.token);
+    await mongo.db.listings.update(listing._id, {
+      status: "PENDING",
+      photos: [{ key, status: "PENDING", blurredKey: null }],
+    });
+    const documents = idDocumentsOver(kit, kit.storage.bucket);
+    const check = documents.check.bind(documents);
+    documents.check = async (first) => {
+      const checks = await check(first);
+      await me.listings.close(me.viewer, first._id.toHexString(), "OTHER");
+      return checks;
+    };
+    await new PhotosService(mongo, kit.storage.bucket, documents).settle(
+      listing._id.toHexString(),
+    );
+    expect(await me.listings.find(listing._id.toHexString())).toMatchObject({
+      status: "CLOSED",
+      photos: [],
+    });
+    // The unchecked photo went with the close, its blurred copy with the job.
+    expect(kit.storage.objects.size).toBe(0);
   });
 });
