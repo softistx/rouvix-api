@@ -20,6 +20,8 @@ const EVERYTHING = `{
   place { label radiusM keptAt point { latitude longitude } }
 }`;
 
+const LISTING_AS_TEXT = `query ($id: ID!) { listing(id: $id) ${EVERYTHING} }`;
+
 const visitorReads = async (id: string) => {
   const response = await kit.app.fetch(
     new Request("http://localhost/graphql", {
@@ -28,7 +30,7 @@ const visitorReads = async (id: string) => {
         "content-type": "application/json",
         "x-rouvix-client": "spec",
       },
-      body: JSON.stringify({ query: `{ listing(id: "${id}") ${EVERYTHING} }` }),
+      body: JSON.stringify({ query: LISTING_AS_TEXT, variables: { id } }),
     }),
   );
   return response.text();

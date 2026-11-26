@@ -104,3 +104,29 @@ describe("the upload budget", () => {
     ).toBe(200);
   });
 });
+
+describe("a photo added to an open listing", () => {
+  test("is settled by the job and becomes ready", async () => {
+    const me = await listingsAs(kit);
+    const declared = await me.listings.declare(
+      me.viewer,
+      { ...lostContent(), kind: "LOST", publish: true },
+      null,
+    );
+    expect(declared.status).toBe("OPEN");
+    const key = await photoOf(kit, me.token);
+    const updated = await me.listings.update(
+      me.viewer,
+      declared._id.toHexString(),
+      lostContent({ photoKeys: [key] }),
+      declared.version,
+      false,
+    );
+    expect(updated.photos).toEqual([{ key, status: "PENDING" }]);
+    await kit.auth.background.settled();
+    expect(await me.listings.find(declared._id.toHexString())).toMatchObject({
+      status: "OPEN",
+      photos: [{ key, status: "READY" }],
+    });
+  });
+});

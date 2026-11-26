@@ -6,7 +6,6 @@ import {
   type CategoriesService,
   type CountriesService,
   countryNotFound,
-  type GeoPoint,
 } from "@/modules/config";
 import type { Now } from "@/shared/dates";
 import { invalidInput } from "@/shared/errors";
@@ -25,38 +24,15 @@ import {
   dayOfString,
   EDITABLE_STATUSES,
   LISTING_DAYS,
+  type ListingContent,
   MAX_EXTENSIONS,
   PUBLIC_STATUSES,
   storedFields,
 } from "../listings.utils";
-import type { CloseReason, KeptAt, ListingKind, listings } from "../models";
+import type { CloseReason, ListingKind, listings } from "../models";
 import type { PhotosService } from "./photos.service";
 
 export type ListingDocument = ReadDocumentOf<typeof listings>;
-
-// What an author states of a listing (stated whole on an update).
-export interface ListingContent {
-  countryCode: string;
-  categoryKey: string;
-  documentType?: string | null | undefined;
-  title: string;
-  description?: string | null | undefined;
-  attributes: {
-    colours: string[];
-    brand?: string | null | undefined;
-    marks?: string | null | undefined;
-  };
-  photoKeys: string[];
-  place: {
-    label: string;
-    point: GeoPoint;
-    radiusM?: number | null | undefined;
-    keptAt?: KeptAt | null | undefined;
-  };
-  // `YYYY-MM-DD`, the Date scalar.
-  date: string;
-  questions: { prompt: string; answer: string }[];
-}
 
 export interface DeclareInput extends ListingContent {
   kind: ListingKind;
@@ -270,7 +246,12 @@ export class ListingsService {
   // Starts the photo job for a published listing that waits for it. A draft is
   // private: its photos settle when it is published.
   private settleLater(listing: ListingDocument) {
-    if (listing.status !== "PENDING") return;
+    const waiting = listing.status === "PENDING";
+    const photos =
+      listing.status !== "DRAFT" &&
+      listing.documentType === null &&
+      listing.photos.some((photo) => photo.status === "PENDING");
+    if (!waiting && !photos) return;
     const id = listing._id.toHexString();
     this.deps.background.run("listing photos", () =>
       this.deps.photos.settleWithRetry(id),

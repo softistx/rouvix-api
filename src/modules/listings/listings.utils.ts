@@ -61,31 +61,35 @@ export const publicPoint = (
     ? point
     : blurredPoint(point);
 
+// What an author states of a listing (stated whole on an update).
+export interface ListingContent {
+  countryCode: string;
+  categoryKey: string;
+  documentType?: string | null | undefined;
+  title: string;
+  description?: string | null | undefined;
+  attributes: {
+    colours: string[];
+    brand?: string | null | undefined;
+    marks?: string | null | undefined;
+  };
+  photoKeys: string[];
+  place: {
+    label: string;
+    point: GeoPoint;
+    radiusM?: number | null | undefined;
+    keptAt?: KeptAt | null | undefined;
+  };
+  // `YYYY-MM-DD`, the Date scalar.
+  date: string;
+  questions: { prompt: string; answer: string }[];
+}
+
 // What a listing's content is stored as: the fields of the stored document.
 // `known` holds the status of the photos the listing already carries; a new
 // key starts pending.
 export function storedFields(
-  content: {
-    countryCode: string;
-    categoryKey: string;
-    documentType?: string | null | undefined;
-    title: string;
-    description?: string | null | undefined;
-    attributes: {
-      colours: string[];
-      brand?: string | null | undefined;
-      marks?: string | null | undefined;
-    };
-    photoKeys: string[];
-    place: {
-      label: string;
-      point: GeoPoint;
-      radiusM?: number | null | undefined;
-      keptAt?: KeptAt | null | undefined;
-    };
-    date: string;
-    questions: { prompt: string; answer: string }[];
-  },
+  content: ListingContent,
   known: ReadonlyMap<string, PhotoStatus>,
 ) {
   return {

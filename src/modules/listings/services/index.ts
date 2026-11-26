@@ -1,7 +1,7 @@
+export type { ListingContent } from "../listings.utils";
 export { ListingMedia } from "./listing-media.service";
 export {
   type DeclareInput,
-  type ListingContent,
   type ListingDeps,
   type ListingDocument,
   ListingsService,

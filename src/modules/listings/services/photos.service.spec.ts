@@ -154,7 +154,8 @@ describe("discard", () => {
     await new PhotosService(mongo, bucket, noPause).discard([key]);
     expect(calls.count).toBe(3);
     expect(kit.storage.objects.size).toBe(0);
-    expect(await mongo.db.listingUploads.findById(key)).toBeUndefined();
+    // The upload record stays: it is the hourly budget's ledger.
+    expect(await mongo.db.listingUploads.findById(key)).toBeDefined();
   });
 
   test("a key that keeps failing is left, with its upload record, without throwing", async () => {

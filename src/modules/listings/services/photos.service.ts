@@ -74,7 +74,8 @@ export class PhotosService {
     }
   }
 
-  // Removes the stored renditions of `keys`, and their upload records, trying
+  // Removes the stored renditions of `keys` (their upload records stay: they
+  // are the account's upload ledger for the hourly budget), trying
   // each key three times. A key that still fails is logged and left behind:
   // the listing's own write has committed, and an orphan sweep (a later
   // slice) takes what remains.
@@ -86,7 +87,6 @@ export class PhotosService {
             { key: mediaObjectKey(PHOTO_KIND, key, PHOTO_FULL) },
             { timeoutMs: TIMEOUT_MS },
           );
-          await this.mongo.db.listingUploads.hardDelete(key);
           break;
         } catch (error) {
           if (attempt === 3) {
