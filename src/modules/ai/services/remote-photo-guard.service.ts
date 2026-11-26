@@ -50,14 +50,17 @@ export class RemotePhotoGuard {
     if (photo.key !== null && (await this.deps.idPhoto(photo.key))) {
       throw documentPhoto();
     }
+    // The country's own number patterns are part of the check: a country the
+    // platform does not serve would switch them off, so it fails closed.
     const country = await this.deps.countries.active(photo.countryCode);
+    if (country === undefined) throw aiUnavailable();
     let text: Awaited<ReturnType<Ocr["read"]>>;
     try {
       text = await this.deps.ocr.read(photo.bytes);
     } catch {
       throw aiUnavailable();
     }
-    const patterns = compilePatterns(country?.idNumberPatterns ?? [], null);
+    const patterns = compilePatterns(country.idNumberPatterns, null);
     if (isIdLike(text, patterns, this.deps.now().getUTCFullYear())) {
       throw documentPhoto();
     }
