@@ -2,12 +2,15 @@ import type { ReadDocumentOf } from "@softistx/mongo";
 import type { ObjectId } from "mongodb";
 import type { Viewer } from "@/auth/access";
 import type { AppMongo } from "@/config/db";
+import {
+  type CategoriesService,
+  type CountriesService,
+  countryNotFound,
+  type GeoPoint,
+} from "@/modules/config";
 import type { Now } from "@/shared/dates";
 import { invalidInput } from "@/shared/errors";
 import { toConnection } from "@/shared/pagination";
-import type { CategoriesService, CountriesService } from "../../config";
-import { countryNotFound } from "../../config/config.errors";
-import { type GeoPoint, toGeoJson } from "../../config/config.utils";
 import {
   extensionLimit,
   invalidStatus,
@@ -24,6 +27,7 @@ import {
   LISTING_DAYS,
   MAX_EXTENSIONS,
   PUBLIC_STATUSES,
+  storedFields,
 } from "../listings.utils";
 import type { CloseReason, KeptAt, ListingKind, listings } from "../models";
 import type { PhotosService } from "./photos.service";
@@ -118,20 +122,29 @@ export class ListingsService {
 
   // Declares a listing, a draft or published at once. `orgId` is the
   // organisation's register the viewer is an agent of (the resolver's guard).
-  async declare(viewer: Viewer, input: DeclareInput, orgId: ObjectId | null) {
-    const fields = await this.fieldsOf(viewer, input, input.kind, null);
-    const published =
-      input.publish === true ? this.publishing(fields.photos.length) : {};
-    const created = await this.mongo.as(viewer.id).db.listings.create({
-      kind: input.kind,
-      authorId: viewer.id,
-      orgId,
-      status: "DRAFT",
-      ...fields,
-      ...published,
+  declare(viewer: Viewer, input: DeclareInput, orgId: ObjectId | null) {
+    // Locked so that two declarations racing for one photo key meet the unique
+    // index (`photos.key`), the loser reading the key as taken.
+    return locked(false, async () => {
+      const fields = await this.fieldsOf(
+        viewer,
+        input,
+        input.kind,
+        null,
+        orgId,
+      );
+      const published = input.publish === true ? this.publishing(fields) : {};
+      const created = await this.mongo.as(viewer.id).db.listings.create({
+        kind: input.kind,
+        authorId: viewer.id,
+        orgId,
+        status: "DRAFT",
+        ...fields,
+        ...published,
+      });
+      this.settleLater(created);
+      return created;
     });
-    this.settleLater(created);
-    return created;
   }
 
   // Replaces the listing's content (stated whole), under `version`; `publish`
@@ -151,13 +164,14 @@ export class ListingsService {
         content,
         listing.kind,
         listing,
+        listing.orgId,
       );
       const removed = listing.photos
         .map((photo) => photo.key)
         .filter((key) => !content.photoKeys.includes(key));
       const publishing =
         publish === true && listing.status === "DRAFT"
-          ? this.publishing(fields.photos.length)
+          ? this.publishing(fields)
           : {};
       const written = await this.mongo.as(viewer.id).db.listings.update(id, {
         ...fields,
@@ -236,35 +250,42 @@ export class ListingsService {
     if (!allowed.includes(listing.status)) throw invalidStatus(listing.status);
   }
 
-  // What publishing sets: open at once without photos, pending until they are
-  // settled with them; 90 days from now.
-  private publishing(photoCount: number) {
+  // What publishing sets: a listing with photos to settle is pending until
+  // they are (the job opens it); one without, or an ID document's (whose photos
+  // are held back for the blur slice and never served), opens at once. 90 days
+  // from now.
+  private publishing(fields: {
+    photos: unknown[];
+    documentType: string | null;
+  }) {
     const now = this.deps.now();
+    const waiting = fields.photos.length > 0 && fields.documentType === null;
     return {
-      status: photoCount === 0 ? ("OPEN" as const) : ("PENDING" as const),
+      status: waiting ? ("PENDING" as const) : ("OPEN" as const),
       publishedAt: now,
       expiresAt: addDays(now, LISTING_DAYS),
     };
   }
 
+  // Starts the photo job for a published listing that waits for it. A draft is
+  // private: its photos settle when it is published.
   private settleLater(listing: ListingDocument) {
-    // A draft is private: its photos settle when it is published.
-    if (listing.status === "DRAFT") return;
-    if (!listing.photos.some((photo) => photo.status === "PENDING")) return;
+    if (listing.status !== "PENDING") return;
     const id = listing._id.toHexString();
     this.deps.background.run("listing photos", () =>
-      this.deps.photos.settle(id),
+      this.deps.photos.settleWithRetry(id),
     );
   }
 
   // The stored fields of a content, once checked: one `invalid-input` with
   // every issue when it is not. `current` is the listing being replaced, whose
-  // own photos stay attachable.
+  // own photos stay attachable; `orgId` its organisation's register, if any.
   private async fieldsOf(
     viewer: Viewer,
     content: ListingContent,
     kind: ListingKind,
     current: ListingDocument | null,
+    orgId: ObjectId | null,
   ) {
     const country = await this.deps.countries.active(content.countryCode);
     if (!country) throw countryNotFound(content.countryCode);
@@ -280,6 +301,7 @@ export class ListingsService {
         keptAt: content.place.keptAt,
         questionCount: content.questions.length,
         photoKeys: content.photoKeys,
+        inRegister: orgId !== null,
       },
       {
         category:
@@ -290,31 +312,10 @@ export class ListingsService {
       },
     );
     if (issues.length > 0) throw invalidInput(issues);
-    const known = new Map(current?.photos.map((p) => [p.key, p.status]));
-    return {
-      countryCode: content.countryCode,
-      categoryKey: content.categoryKey,
-      documentType: content.documentType ?? null,
-      title: content.title,
-      description: content.description ?? "",
-      attributes: {
-        colours: content.attributes.colours,
-        brand: content.attributes.brand ?? null,
-        marks: content.attributes.marks ?? null,
-      },
-      photos: content.photoKeys.map((key) => ({
-        key,
-        status: known.get(key) ?? ("PENDING" as const),
-      })),
-      place: {
-        label: content.place.label,
-        point: toGeoJson(content.place.point),
-        radiusM: content.place.radiusM ?? null,
-        keptAt: content.place.keptAt ?? null,
-      },
-      date: dayOfString(content.date),
-      questions: content.questions,
-    };
+    return storedFields(
+      content,
+      new Map(current?.photos.map((p) => [p.key, p.status])),
+    );
   }
 
   // The keys the viewer uploaded that no other listing carries.
@@ -324,6 +325,10 @@ export class ListingsService {
     current: ListingDocument | null,
   ) {
     if (keys.length === 0) return new Set<string>();
+    // The listing's own photos stay attachable to whoever edits it (its
+    // author, or an agent of its organisation); a new key must be the
+    // editor's own upload.
+    const own = new Set(current?.photos.map((photo) => photo.key));
     const [uploads, attached] = await Promise.all([
       this.mongo.db.listingUploads.findMany({
         filter: { _id: { $in: [...keys] }, accountId: viewer.id },
@@ -336,8 +341,9 @@ export class ListingsService {
       }),
     ]);
     const taken = new Set(attached.flatMap((l) => l.photos.map((p) => p.key)));
-    return new Set(
-      uploads.map((upload) => upload._id).filter((key) => !taken.has(key)),
-    );
+    return new Set([
+      ...own,
+      ...uploads.map((upload) => upload._id).filter((key) => !taken.has(key)),
+    ]);
   }
 }

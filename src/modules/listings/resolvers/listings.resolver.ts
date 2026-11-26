@@ -1,6 +1,6 @@
 import { requireUser } from "@/auth/guards";
 import type { Resolvers } from "@/generated/graphql/resolvers";
-import { fromGeoJson } from "../../config/config.utils";
+import { fromGeoJson } from "@/modules/config";
 import { listingIdOf } from "../listings.errors";
 import { dateString, publicPoint } from "../listings.utils";
 import { declarer, editorOf } from "./support";
@@ -69,8 +69,13 @@ export const listingResolvers: Resolvers = {
             .filter((photo) => photo.status === "READY")
             .map((photo) => photo.key)
         : [],
-    place: ({ place }) => ({
-      label: place.label,
+    place: ({ place, documentType }) => ({
+      // The author's words are withheld for an item kept at home and for an
+      // ID document.
+      label:
+        place.keptAt === "WITH_FINDER" || documentType !== null
+          ? null
+          : place.label,
       point: publicPoint(fromGeoJson(place.point), place.keptAt),
       radiusM: place.radiusM,
       keptAt: place.keptAt,

@@ -890,7 +890,10 @@ The place as a visitor sees it: a point blurred to about 110 m unless the item i
 """
 type PublicPlace {
   keptAt: KeptAt
-  label: String!
+  """
+  Where, in the author's words; null for an item kept with its finder, whose words could name their home, and for an ID document.
+  """
+  label: String
   point: GeoPoint!
   radiusM: Int
 }

@@ -3,6 +3,7 @@ import { type MediaBucket, mediaRoutes } from "@softistx/alxia-media";
 import type { Access, Viewer } from "../auth/access";
 import type { AppMongo } from "../config/db";
 import { ListingMedia, listingKinds } from "../modules/listings";
+import type { Now } from "../shared/dates";
 import { requireClientMiddleware } from "./csrf";
 
 export const MEDIA_PREFIX = "/media";
@@ -13,7 +14,7 @@ export const MEDIA_PREFIX = "/media";
 // middleware resolved, so mount them after it. A kind's callbacks read
 // `listingMedia`, derived per request.
 export const mediaApp = (
-  deps: { mongo: AppMongo; access: Access },
+  deps: { mongo: AppMongo; access: Access; now: Now },
   bucket: MediaBucket,
 ) =>
   definePlugin<{ viewer: Viewer | null }>()((app) =>
@@ -24,6 +25,7 @@ export const mediaApp = (
           viewer,
           access: deps.access,
           mongo: deps.mongo,
+          now: deps.now,
         }),
       }))
       .plugin(

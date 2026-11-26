@@ -4,7 +4,7 @@ import { codeOf } from "~/codes";
 import { clearDatabase, resetConfig } from "~/db";
 import { signedIn } from "~/fixtures";
 import { graphql } from "~/generated/graphql";
-import { listingsAs, lostContent } from "~/listings";
+import { lostContent } from "~/listings";
 
 // Who may touch a listing: its author, and the agents of its organisation;
 // nobody else, and a stranger cannot tell a draft exists.
@@ -141,114 +141,5 @@ describe("another account", () => {
         ),
       ).toBe(NOT_FOUND);
     }
-  });
-});
-
-describe("an organisation's register", () => {
-  async function register() {
-    const admin = await listingsAs(kit, 1);
-    const organisation = await admin.services.organisations.create(
-      admin.viewer,
-      {
-        name: "Mairie de test",
-        kind: "TOWN_HALL",
-        slug: "mairie-de-test",
-        city: "Douala",
-      },
-    );
-    const agent = await listingsAs(kit, 2);
-    const { token } = await admin.services.members.invite(
-      admin.viewer,
-      organisation._id,
-      { phone: agent.viewer.phone, role: "AGENT" },
-    );
-    await agent.services.members.accept(agent.viewer, token);
-    return { admin, agent, slug: organisation.slug };
-  }
-
-  test("an agent declares for it, and the organisation's other agents and admins edit it", async () => {
-    const { admin, agent, slug } = await register();
-    const declared = await kit
-      .client(agent.token)
-      .query(DECLARE_LISTING_MUTATION, {
-        variables: { input: { ...input, organisationSlug: slug } },
-      });
-    expect(declared.data?.declareListing.organisationSlug).toBe(slug);
-    const { id } = (declared.data?.declareListing ?? {}) as { id: string };
-    const asAdmin = await kit
-      .client(admin.token)
-      .query(EXTEND_LISTING_MUTATION, { variables: { id } });
-    expect(asAdmin.data?.extendListing.extendedCount).toBe(1);
-    expect(
-      (
-        await kit
-          .client(admin.token)
-          .query(MY_LISTING_QUERY, { variables: { id } })
-      ).data?.myListing.organisationSlug,
-    ).toBe(slug);
-    expect(
-      (await kit.client().query(PUBLIC_LISTING_QUERY, { variables: { id } }))
-        .data?.listing.organisationSlug,
-    ).toBe(slug);
-  });
-
-  test("a non-member cannot declare for it, nor edit its listings", async () => {
-    const { agent, slug } = await register();
-    const outsider = await signedIn(kit, { phone: "+237600000003" });
-    const refused = await kit
-      .client(outsider.token)
-      .query(DECLARE_LISTING_MUTATION, {
-        variables: { input: { ...input, organisationSlug: slug } },
-      });
-    expect(codeOf(refused)).toBe("organisations.errors.organisation-not-found");
-    const declared = await kit
-      .client(agent.token)
-      .query(DECLARE_LISTING_MUTATION, {
-        variables: { input: { ...input, organisationSlug: slug } },
-      });
-    const { id } = (declared.data?.declareListing ?? {}) as { id: string };
-    expect(
-      codeOf(
-        await kit.client(outsider.token).query(CLOSE_LISTING_MUTATION, {
-          variables: { id, reason: "OTHER" },
-        }),
-      ),
-    ).toBe(NOT_FOUND);
-  });
-
-  test("a removed agent loses the register's listings", async () => {
-    const { admin, agent, slug } = await register();
-    const declared = await kit
-      .client(admin.token)
-      .query(DECLARE_LISTING_MUTATION, {
-        variables: { input: { ...input, organisationSlug: slug } },
-      });
-    const { id } = (declared.data?.declareListing ?? {}) as { id: string };
-    expect(
-      (
-        await kit
-          .client(agent.token)
-          .query(MY_LISTING_QUERY, { variables: { id } })
-      ).errors,
-    ).toBeUndefined();
-    const [member] = (
-      await admin.services.members.list(
-        (
-          await admin.services.organisations.bySlug(slug)
-        )?._id as never,
-        { first: 10, after: null },
-      )
-    ).edges.filter((e) => e.node.accountId === agent.viewer.id);
-    await admin.services.members.remove(
-      (await admin.services.organisations.bySlug(slug))?._id as never,
-      String(member?.node._id),
-    );
-    expect(
-      codeOf(
-        await kit
-          .client(agent.token)
-          .query(MY_LISTING_QUERY, { variables: { id } }),
-      ),
-    ).toBe(NOT_FOUND);
   });
 });

@@ -219,8 +219,7 @@ services:
       timeout: 3s
       retries: 5
 
-  # The S3 gateway of the private bucket the photos will live in (a later
-  # slice). Private: only the API reaches it, so on `internal` alone. The
+  # The S3 gateway of the private bucket the photos live in. Private: only the API reaches it, so on `internal` alone. The
   # identities file is written from the environment at each start.
   s3:
     <<: *common

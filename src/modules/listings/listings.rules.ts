@@ -14,6 +14,8 @@ export interface ContentRulesInput {
   keptAt: KeptAt | null | undefined;
   questionCount: number;
   photoKeys: readonly string[];
+  // The listing is in an organisation's register.
+  inRegister: boolean;
 }
 
 export interface RulesLookups {
@@ -101,8 +103,11 @@ function kindIssues(input: ContentRulesInput): FieldIssue[] {
     ];
   }
   return [
+    // A found item is at an organisation only in that organisation's register.
     ...(input.keptAt
-      ? []
+      ? input.keptAt === "AT_ORGANISATION" && !input.inRegister
+        ? [issue("place.keptAt", "validation.errors.invalid")]
+        : []
       : [issue("place.keptAt", "validation.errors.required")]),
     ...(input.radiusM === null || input.radiusM === undefined
       ? []

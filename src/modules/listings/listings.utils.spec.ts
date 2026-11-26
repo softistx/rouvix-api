@@ -17,6 +17,15 @@ describe("dates", () => {
     expect(dayOf(new Date(2026, 10, 27, 15, 30)).getUTCHours()).toBe(0);
   });
 
+  test("the day of an instant is its UTC day, whatever the server's zone", () => {
+    expect(dayOf(new Date("2026-11-27T23:59:59.000Z")).toISOString()).toBe(
+      "2026-11-27T00:00:00.000Z",
+    );
+    expect(dayOf(new Date("2026-11-28T00:00:01.000Z")).toISOString()).toBe(
+      "2026-11-28T00:00:00.000Z",
+    );
+  });
+
   test("addDays adds whole days", () => {
     expect(
       addDays(dayOfString("2026-11-27"), 90).toISOString().slice(0, 10),

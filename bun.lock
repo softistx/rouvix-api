@@ -24,6 +24,7 @@
         "@softistx/mail-smtp": "^1.1.1",
         "@softistx/mongo": "^0.30.1",
         "@softistx/redis": "^0.24.0",
+        "@softistx/s3": "^0.13.1",
         "graphql": "^17.1.0",
         "mongodb": "^7.9.1",
         "nodemailer": "^10.6.1",

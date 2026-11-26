@@ -12,6 +12,8 @@ export class PhotosService {
   constructor(
     private readonly mongo: AppMongo,
     private readonly bucket: MediaBucket,
+    private readonly pause: (ms: number) => Promise<void> = (ms) =>
+      new Promise((resolve) => setTimeout(resolve, ms)),
   ) {}
 
   // Whether the photo's rendition is in the bucket.
@@ -25,16 +27,16 @@ export class PhotosService {
     return true;
   }
 
-  // Settles a listing's photos, as the background job after a write does: a
+  // Settles a listing's photos, as the background job after a publish does: a
   // pending photo whose rendition is stored is READY, one that is not is
-  // dropped. A document's photos stay pending, held back for the OCR and blur
-  // of a later slice (never public meanwhile). A pending listing with no
-  // pending photo left opens.
+  // dropped, and a pending listing with no pending photo left opens. An ID
+  // document's photos stay pending, held back for the OCR and blur of a later
+  // slice (never served meanwhile).
   async settle(listingId: string): Promise<void> {
     await locked(false, async () => {
       const listing = await this.mongo.db.listings.findById(listingId);
-      if (listing === undefined || listing.documentType !== null) return;
-      if (!listing.photos.some((photo) => photo.status === "PENDING")) return;
+      if (listing === undefined || listing.status === "DRAFT") return;
+      if (listing.documentType !== null && listing.photos.length > 0) return;
       const settled = await Promise.all(
         listing.photos.map(async (photo) =>
           photo.status === "READY" || (await this.stored(photo.key))
@@ -42,29 +44,55 @@ export class PhotosService {
             : undefined,
         ),
       );
+      const photos = settled.filter((photo) => photo !== undefined);
+      const opens = listing.status === "PENDING";
+      const same =
+        photos.length === listing.photos.length &&
+        listing.photos.every((photo) => photo.status === "READY");
+      if (!opens && same) return;
       await this.mongo.db.listings.update(listing._id, {
-        photos: settled.filter((photo) => photo !== undefined),
+        photos,
+        ...(opens && { status: "OPEN" as const }),
         // Locked on what was read: a write that came in between (a removal, a
         // close) makes this one read again instead of overwriting it.
         version: listing.version,
-        ...(listing.status === "PENDING" && { status: "OPEN" as const }),
       });
     });
   }
 
-  // Removes the stored renditions of `keys`, and their upload records. A
-  // failure is logged and left to a later sweep, never thrown: the listing's
-  // own write has committed.
+  // The job as the write starts it: a bucket that does not answer is tried
+  // again, three times with a growing pause; past that the listing stays
+  // pending and any later update of it settles it again.
+  async settleWithRetry(listingId: string, attempts = 3): Promise<void> {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await this.settle(listingId);
+      } catch (error) {
+        if (attempt >= attempts) throw error;
+        await this.pause(attempt * 500);
+      }
+    }
+  }
+
+  // Removes the stored renditions of `keys`, and their upload records, trying
+  // each key three times. A key that still fails is logged and left behind:
+  // the listing's own write has committed, and an orphan sweep (a later
+  // slice) takes what remains.
   async discard(keys: readonly string[]): Promise<void> {
     for (const key of keys) {
-      try {
-        await this.bucket.delete(
-          { key: mediaObjectKey(PHOTO_KIND, key, PHOTO_FULL) },
-          { timeoutMs: TIMEOUT_MS },
-        );
-        await this.mongo.db.listingUploads.hardDelete(key);
-      } catch (error) {
-        console.error(`rouvix-api: photo ${key} not removed:`, error);
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          await this.bucket.delete(
+            { key: mediaObjectKey(PHOTO_KIND, key, PHOTO_FULL) },
+            { timeoutMs: TIMEOUT_MS },
+          );
+          await this.mongo.db.listingUploads.hardDelete(key);
+          break;
+        } catch (error) {
+          if (attempt === 3) {
+            console.error(`rouvix-api: photo ${key} not removed:`, error);
+          } else await this.pause(attempt * 200);
+        }
       }
     }
   }

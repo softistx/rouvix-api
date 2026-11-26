@@ -80,7 +80,8 @@ type ListingPlace {
 
 "The place as a visitor sees it: a point blurred to about 110 m unless the item is kept in a public place."
 type PublicPlace {
-  label: String!
+  "Where, in the author's words; null for an item kept with its finder, whose words could name their home, and for an ID document."
+  label: String
   point: GeoPoint!
   radiusM: Int
   keptAt: KeptAt

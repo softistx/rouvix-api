@@ -24,6 +24,7 @@ const lost = (over: Partial<ContentRulesInput> = {}): ContentRulesInput => ({
   keptAt: null,
   questionCount: 0,
   photoKeys: [],
+  inRegister: false,
   ...over,
 });
 const found = (over: Partial<ContentRulesInput> = {}): ContentRulesInput =>

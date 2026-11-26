@@ -57,7 +57,7 @@ export function createApp(options: AppOptions = {}) {
     .plugin(probes(cataloguesReady))
     .use("/graphql", noStoreMiddleware)
     .plugin((app) => graphql(app, graphqlOptions(deps, options.onUnexpected)))
-    .plugin(mediaApp({ mongo, access }, media))
+    .plugin(mediaApp({ mongo, access, now }, media))
     .onStop(async () => {
       await mongo.close();
       await redis?.close();

@@ -100,24 +100,16 @@ describe("the masked view", () => {
       { ...content, kind: "LOST", publish: true },
       null,
     );
-    const [id] = [declared._id.toHexString()];
-    // The photo stays pending, so the listing is not even public yet...
-    expect(await visitorReads(id)).toContain(
-      "listings.errors.listing-not-found",
-    );
-    // ...and once it is (no photo), the text is still withheld.
-    const bare = await me.listings.declare(
-      me.viewer,
-      { ...content, photoKeys: [], kind: "LOST", publish: true },
-      null,
-    );
-    const text = await visitorReads(bare._id.toHexString());
+    // Published at once (its photo is held back, never served), masked.
+    expect(declared.status).toBe("OPEN");
+    const text = await visitorReads(declared._id.toHexString());
     expect(text).toContain('"documentType":"CNI"');
     expect(text).toContain('"title":null');
     expect(text).toContain('"description":null');
     expect(text).toContain('"attributes":null');
     expect(text).toContain('"photoKeys":[]');
     for (const secret of [
+      "Marché de test",
       "Personne Imaginaire",
       "000000000",
       "Nulle Part",

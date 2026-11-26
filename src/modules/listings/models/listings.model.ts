@@ -90,7 +90,13 @@ export const listings = defineCollection({
   indexes: [
     { key: { authorId: 1, createdAt: -1 }, name: "listings_author" },
     { key: { status: 1, expiresAt: 1 }, name: "listings_status_expiry" },
-    { key: { "photos.key": 1 }, name: "listings_photo_key" },
+    // Unique: a media key is on one listing at most, whatever the races.
+    {
+      key: { "photos.key": 1 },
+      name: "listings_photo_key",
+      unique: true,
+      sparse: true,
+    },
     { key: { orgId: 1, status: 1 }, name: "listings_org" },
   ],
 });
