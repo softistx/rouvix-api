@@ -79,7 +79,8 @@ export const listingResolvers: Resolvers = {
       point: publicPoint(fromGeoJson(place.point), place.keptAt),
       radiusM: place.radiusM,
       keptAt: place.keptAt,
-      city: place.city,
+      // An ID document's town could be its holder's: withheld like its label.
+      city: documentType === null ? place.city : null,
     }),
     organisationSlug: (listing, _, ctx) =>
       listing.orgId === null

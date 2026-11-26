@@ -94,7 +94,9 @@ describe(id, () => {
           point.longitude,
           point.latitude,
         ]);
-        expect(derived.cityKey).toBe(cityKeyOf("Yaoundé"));
+        expect(derived.cityKey).toBe(
+          doc.documentType ? null : cityKeyOf("Yaoundé"),
+        );
         expect(derived.searchText).toBe(
           searchTextOf({
             documentType: doc.documentType,

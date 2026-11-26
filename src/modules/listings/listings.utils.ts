@@ -171,7 +171,8 @@ export function storedFields(
       city: content.place.city?.trim() || null,
     },
     searchText: searchTextOf(content),
-    cityKey: cityKeyOf(content.place.city),
+    // An ID document's town could be its holder's: never searchable.
+    cityKey: content.documentType ? null : cityKeyOf(content.place.city),
     geo: toGeoJson(
       searchPoint(content.place.point, content.place.keptAt ?? null),
     ),

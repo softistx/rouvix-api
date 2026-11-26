@@ -33,13 +33,14 @@ export function derive(doc: Source) {
       ]
         .filter((part): part is string => !!part)
         .join(" ");
-  const cityKey =
-    (doc.place?.city ?? "")
-      .normalize("NFD")
-      .replace(/\p{M}/gu, "")
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .trim() || null;
+  const cityKey = doc.documentType
+    ? null
+    : (doc.place?.city ?? "")
+        .normalize("NFD")
+        .replace(/\p{M}/gu, "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim() || null;
   const coordinates = doc.place?.point?.coordinates;
   const publicPlace =
     doc.place?.keptAt === "AT_POLICE" ||

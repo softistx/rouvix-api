@@ -110,6 +110,7 @@ describe("what a visitor's search and map answer", () => {
       description: "Numéro 000000000, né à Nulle Part",
       attributes: { colours: ["bleu"], brand: "Marque", marks: "tache" },
       photoKeys: [key],
+      place: { ...lostContent().place, city: "Marie Ngono" },
     });
     for (const text of [
       "Imaginaire",
@@ -122,7 +123,13 @@ describe("what a visitor's search and map answer", () => {
       const found = await asVisitor(SEARCH, { filter: { text } });
       expect(found).toContain('"totalCount":0');
     }
+    // Its town could be its holder's name: not returned, not filterable.
+    expect(
+      await asVisitor(SEARCH, { filter: { city: "Marie Ngono" } }),
+    ).toContain('"totalCount":0');
     const byType = await asVisitor(SEARCH, { filter: { documentType: "CNI" } });
+    expect(byType).toContain('"city":null');
+    expect(byType).not.toContain("Ngono");
     expect(byType).toContain('"totalCount":1');
     expect(byType).toContain('"title":null');
     expect(byType).toContain('"photoKeys":[]');

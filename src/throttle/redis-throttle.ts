@@ -21,6 +21,7 @@ type Counter = Pick<BoundRateLimit<{ key: string }>, "consume">;
 
 // How long a counting may take before the call goes through uncounted.
 const TIMEOUT_MS = 200;
+const LOG_EVERY_MS = 60_000;
 
 // The Throttle over `@softistx/redis` rate limits. A visitor's read fails open
 // (spec §3: "fail closed for sign-in codes, open elsewhere"): Redis down, slow
@@ -28,7 +29,10 @@ const TIMEOUT_MS = 200;
 // search down with it.
 export function redisThrottle(
   counters: Record<ThrottleScope, Counter>,
+  options: { log?: (line: string) => void; now?: () => number } = {},
 ): Throttle {
+  const { log = console.error, now = Date.now } = options;
+  let loggedAt = Number.NEGATIVE_INFINITY;
   return {
     async take(scope, key): Promise<ThrottleVerdict> {
       try {
@@ -39,7 +43,14 @@ export function redisThrottle(
           allowed: result.allowed,
           retryAfter: Math.ceil(result.retryAfter / 1000),
         };
-      } catch {
+      } catch (error) {
+        // Once a minute at most: an outage must not flood the log.
+        if (now() - loggedAt >= LOG_EVERY_MS) {
+          loggedAt = now();
+          log(
+            `throttle open: ${scope} not counted (${error instanceof Error ? error.name : "error"})`,
+          );
+        }
         return { allowed: true, retryAfter: 0 };
       }
     },

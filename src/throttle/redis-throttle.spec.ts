@@ -57,6 +57,31 @@ describe("redisThrottle", () => {
   });
 });
 
+describe("when it fails open", () => {
+  test("logs once a minute, never the key", async () => {
+    const lines: string[] = [];
+    let clock = 0;
+    const throttle = redisThrottle(
+      {
+        "visitor-read": {
+          consume: async () => {
+            throw new Error("down");
+          },
+        },
+      },
+      { log: (line) => lines.push(line), now: () => clock },
+    );
+    for (const at of [0, 10_000, 59_999, 60_000]) {
+      clock = at;
+      await throttle.take("visitor-read", "203.0.113.7");
+    }
+    expect(lines).toEqual([
+      "throttle open: visitor-read not counted (Error)",
+      "throttle open: visitor-read not counted (Error)",
+    ]);
+  });
+});
+
 describe("the visitor read limit", () => {
   test("120 a minute per address, 40 at once", () => {
     expect(limits["visitor-read"]).toMatchObject({
