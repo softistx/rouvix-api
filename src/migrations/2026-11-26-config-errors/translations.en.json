@@ -1,0 +1,8 @@
+{
+  "config.errors.country-not-found": "The country \"{code}\" is unknown or inactive.",
+  "config.errors.document-type-unknown": "The document type \"{key}\" is not an active document category.",
+  "config.errors.category-parent-invalid": "The parent \"{parent}\" does not fit: {reason, select, self {a category cannot be its own parent} unknown {it does not exist} notroot {it is not a root category} haschildren {this category has subcategories} other {documents and non-documents do not mix}}.",
+  "config.errors.safe-place-not-found": "This handover place could not be found.",
+  "config.errors.geocoding-unavailable": "Place search is briefly unavailable. Try again in a moment.",
+  "config.errors.stale-version": "This place changed at the same time. Reload it and try again."
+}

@@ -1,0 +1,238 @@
+"A text in each language the platform speaks."
+type LocalizedText {
+  fr: String!
+  en: String!
+}
+
+input LocalizedTextInput {
+  fr: String! @constraint(minLength: 1, maxLength: 120)
+  en: String! @constraint(minLength: 1, maxLength: 120)
+}
+
+"A point on the earth, in degrees."
+type GeoPoint {
+  latitude: Latitude!
+  longitude: Longitude!
+}
+
+input GeoPointInput {
+  latitude: Latitude!
+  longitude: Longitude!
+}
+
+"The regular expression an ID number of one document type matches in a country."
+type IdNumberPattern {
+  "The key of a document category the country offers."
+  documentType: String!
+  "A JavaScript regular expression, anchored."
+  pattern: String!
+}
+
+input IdNumberPatternInput {
+  documentType: String!
+    @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+  pattern: String! @constraint(minLength: 1, maxLength: 200)
+}
+
+"A country the platform serves: configuration, not code."
+type Country {
+  "ISO 3166-1 alpha-2, upper case."
+  code: String!
+  "The name in the request's language."
+  name: String!
+  "The name in each language, for the admin's form."
+  names: LocalizedText!
+  "The international prefix, `+237`."
+  dialCode: String!
+  "A regular expression an E.164 number of the country matches."
+  phonePattern: String!
+  "Keys of the document categories the country offers (CNI, PASSPORT…)."
+  documentTypes: [String!]! @listSize(assumedSize: 30)
+  languages: [Language!]! @listSize(assumedSize: 2)
+  mapCenter: GeoPoint!
+  "The map's zoom level over the whole country, 1 to 18."
+  mapZoom: Int!
+  idNumberPatterns: [IdNumberPattern!]! @listSize(assumedSize: 30)
+  "An inactive country is out of the public lists."
+  active: Boolean!
+}
+
+input CountryInput {
+  code: String! @constraint(pattern: "^[A-Z]{2}$")
+  names: LocalizedTextInput!
+  dialCode: String! @constraint(pattern: "^\\+[1-9][0-9]{0,3}$")
+  phonePattern: String! @constraint(minLength: 1, maxLength: 200)
+  documentTypes: [String!]! @constraint(maxItems: 30)
+  languages: [Language!]! @constraint(minItems: 1, maxItems: 2)
+  mapCenter: GeoPointInput!
+  mapZoom: Int! @constraint(min: 1, max: 18)
+  idNumberPatterns: [IdNumberPatternInput!]! @constraint(maxItems: 30)
+  active: Boolean! = true
+}
+
+"""
+A category of item, in a tree of two levels. A document category
+(`isDocument`) has its photo processed on the platform's own servers only.
+"""
+type Category {
+  key: String!
+  "The label in the request's language."
+  label: String!
+  "The label in each language, for the admin's form."
+  labels: LocalizedText!
+  "The key of the root this category sits under; null for a root."
+  parent: String
+  isDocument: Boolean!
+  "The position among its siblings."
+  order: Int!
+  "An inactive category is out of the public lists."
+  active: Boolean!
+}
+
+input CategoryInput {
+  key: String!
+    @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+  labels: LocalizedTextInput!
+  parent: String
+    @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+  isDocument: Boolean!
+  order: Int! @constraint(min: 0, max: 10000)
+  active: Boolean! = true
+}
+
+"Who keeps a safe place."
+enum SafePlaceKind {
+  POLICE
+  PARTNER_ORG
+}
+
+"A place to hand an item over: a police station, or a partner organisation."
+type SafePlace {
+  id: ID!
+  "ISO 3166-1 alpha-2."
+  countryCode: String!
+  city: String!
+  name: String!
+  kind: SafePlaceKind!
+  location: GeoPoint!
+  "Opening hours, free text; null when unknown."
+  hours: String
+  "Passed back to `updateSafePlace` to lock the write."
+  version: Int!
+}
+
+input SafePlaceInput {
+  countryCode: String! @constraint(pattern: "^[A-Z]{2}$")
+  city: String! @constraint(minLength: 1, maxLength: 120)
+  name: String! @constraint(minLength: 1, maxLength: 160)
+  kind: SafePlaceKind!
+  location: GeoPointInput!
+  hours: String @constraint(minLength: 1, maxLength: 200)
+}
+
+type SafePlaceEdge {
+  node: SafePlace!
+}
+
+type SafePlaceConnection {
+  edges: [SafePlaceEdge!]! @listSize(assumedSize: 100)
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"A safe place and how far it is from the point asked."
+type SafePlaceNear {
+  place: SafePlace!
+  "The great-circle distance in metres."
+  distanceM: Int!
+}
+
+"A place a provider found."
+type GeocodeResult {
+  "The provider's one-line name of the place."
+  label: String!
+  point: GeoPoint!
+  city: String
+  "ISO 3166-1 alpha-2, when the provider names a country."
+  countryCode: String
+}
+
+extend type Query {
+  """
+  The countries the platform serves, by code. Public. `includeInactive` needs the
+  platform admin (401, `accounts.errors.suspended` 403, `auth.errors.forbidden` 403).
+  """
+  countries(includeInactive: Boolean = false): [Country!]!
+    @listSize(assumedSize: 20)
+  "One country by code, or null for an unknown or inactive one. Public."
+  country(code: String! @constraint(pattern: "^[A-Z]{2}$")): Country
+  """
+  The categories of item in tree order (a root, then its children). Public.
+  `includeInactive` needs the platform admin, as for `countries`.
+  """
+  categories(includeInactive: Boolean = false): [Category!]!
+    @listSize(assumedSize: 40)
+  "The safe places, by city, optionally of one country or city. Public."
+  safePlaces(
+    countryCode: String @constraint(pattern: "^[A-Z]{2}$")
+    city: String @constraint(minLength: 1, maxLength: 120)
+    first: Int = 20 @constraint(min: 1, max: 100)
+    after: String
+  ): SafePlaceConnection!
+  "The safe places within a radius of a point, nearest first. Public."
+  safePlacesNear(
+    point: GeoPointInput!
+    radiusM: Int = 5000 @constraint(min: 100, max: 100000)
+    first: Int = 10 @constraint(min: 1, max: 50)
+    countryCode: String @constraint(pattern: "^[A-Z]{2}$")
+  ): [SafePlaceNear!]! @listSize(assumedSize: 50)
+  """
+  Places matching a text, through the geocoding provider (cached, one request
+  a second). Needs a signed-in, unsuspended account (the public provider is
+  spared the anonymous traffic). `config.errors.geocoding-unavailable` (503)
+  when the provider does not answer.
+  """
+  geocode(
+    query: String! @constraint(minLength: 2, maxLength: 200)
+    countryCode: String @constraint(pattern: "^[A-Z]{2}$")
+    first: Int = 5 @constraint(min: 1, max: 10)
+  ): [GeocodeResult!]! @listSize(assumedSize: 10)
+  """
+  The place at a point, or null where the provider knows none. The same
+  guard and refusal as `geocode`.
+  """
+  reverseGeocode(point: GeoPointInput!): GeocodeResult
+}
+
+extend type Mutation {
+  """
+  Makes or replaces a country (stated whole). Needs the platform admin (401,
+  403 `accounts.errors.suspended`, 403 `auth.errors.forbidden`). A document
+  type that is no live document category is `config.errors.document-type-unknown`
+  and a pattern that is no regular expression `validation.errors.invalid-format`,
+  each on its path of one `validation.errors.invalid-input`.
+  """
+  setCountry(input: CountryInput!): Country!
+  """
+  Makes or replaces a category (stated whole). Needs the platform admin. A parent
+  that is unknown, not a root, the category itself, or of another document-ness
+  is `config.errors.category-parent-invalid` on `parent`.
+  """
+  setCategory(input: CategoryInput!): Category!
+  """
+  Adds a safe place. Needs the platform admin. A country that is unknown or
+  inactive is `config.errors.country-not-found` (400, on `countryCode`).
+  """
+  createSafePlace(input: SafePlaceInput!): SafePlace!
+  """
+  Replaces a safe place's fields (stated whole). Needs the platform admin; the
+  refusals of `createSafePlace`, `config.errors.safe-place-not-found` (404), and,
+  with `version`, `config.errors.stale-version` (409) when someone wrote first.
+  """
+  updateSafePlace(id: ID!, input: SafePlaceInput!, version: Int): SafePlace!
+  """
+  Archives a safe place, returning its id. Needs the platform admin;
+  `config.errors.safe-place-not-found` (404) for an unknown one.
+  """
+  deleteSafePlace(id: ID!): ID!
+}

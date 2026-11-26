@@ -32,7 +32,8 @@ describe("phone numbers in the schema", () => {
   test("the only field called phone is Account.phone", () => {
     const phones = objectTypes.flatMap((type) =>
       Object.keys(type.getFields())
-        .filter((name) => /phone/i.test(name))
+        // `phonePattern` is a country's regular expression, not a number.
+        .filter((name) => /phone/i.test(name) && name !== "phonePattern")
         .map((name) => `${type.name}.${name}`),
     );
     expect(phones.sort()).toEqual(["Account.phone", "Member.phoneMasked"]);
@@ -42,7 +43,9 @@ describe("phone numbers in the schema", () => {
     const inputs = Object.values(typeMap)
       .filter(isInputObjectType)
       .flatMap((type) =>
-        Object.keys(type.getFields()).filter((name) => /phone/i.test(name)),
+        Object.keys(type.getFields()).filter(
+          (name) => /phone/i.test(name) && name !== "phonePattern",
+        ),
       );
     expect(inputs).toEqual([]);
     const invite = (schema.getMutationType() as GraphQLObjectType).getFields()[

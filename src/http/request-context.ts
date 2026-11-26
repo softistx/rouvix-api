@@ -2,6 +2,7 @@ import type { Mailer } from "@softistx/mail";
 import type { Viewer } from "../auth/access";
 import type { Auth } from "../auth/auth";
 import type { AppMongo } from "../config/db";
+import type { Geocoder } from "../geocoder";
 import { services } from "../modules";
 import type { Now } from "../shared/dates";
 import type { SmsSender } from "../sms";
@@ -13,6 +14,7 @@ export interface ContextDeps {
   auth: Auth;
   sms: SmsSender;
   mailer: Mailer;
+  geocoder: Geocoder;
   now: Now;
 }
 

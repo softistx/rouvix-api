@@ -79,7 +79,16 @@ describe("the collections", () => {
 
   test("the global and the tenant collections are told apart", () => {
     const names = Object.keys(collections).sort();
-    expect(names).toEqual(["members", "organisations", "translations"]);
+    expect(names).toEqual([
+      "categories",
+      "countries",
+      "members",
+      "organisations",
+      "safePlaces",
+      "translations",
+    ]);
+    expect(isTenantOwned(collections.countries, "organisationId")).toBe(false);
+    expect(isTenantOwned(collections.safePlaces, "organisationId")).toBe(false);
     expect(isTenantOwned(collections.organisations, "organisationId")).toBe(
       false,
     );

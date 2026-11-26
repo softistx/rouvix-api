@@ -83,6 +83,12 @@ x-api-env: &api-env
   AT_USERNAME: ${AT_USERNAME:?}
   AT_API_KEY: ${AT_API_KEY:?}
   AT_SENDER_ID: ${AT_SENDER_ID:?}
+  # The geocoding provider's usage policy wants an identifying User-Agent with
+  # a contact: set it in deploy/.env.
+  GEOCODER_USER_AGENT: ${GEOCODER_USER_AGENT:?}
+  # The geocoding provider's usage policy wants an identifying User-Agent with
+  # a contact: set it in deploy/.env.
+  GEOCODER_USER_AGENT: ${GEOCODER_USER_AGENT:?}
 
 services:
   # ── data ────────────────────────────────────────────────────────────────────

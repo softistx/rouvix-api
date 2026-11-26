@@ -141,8 +141,72 @@ scalar CIDRv4 @specifiedBy(url: "https://www.rfc-editor.org/rfc/rfc4632")
 """An IPv6 block in CIDR notation, such as 2001:db8::/32."""
 scalar CIDRv6 @specifiedBy(url: "https://www.rfc-editor.org/rfc/rfc4291")
 
+"""
+A category of item, in a tree of two levels. A document category
+(`isDocument`) has its photo processed on the platform's own servers only.
+"""
+type Category {
+  """An inactive category is out of the public lists."""
+  active: Boolean!
+  isDocument: Boolean!
+  key: String!
+  """The label in the request's language."""
+  label: String!
+  """The label in each language, for the admin's form."""
+  labels: LocalizedText!
+  """The position among its siblings."""
+  order: Int!
+  """The key of the root this category sits under; null for a root."""
+  parent: String
+}
+
+input CategoryInput {
+  active: Boolean! = true
+  isDocument: Boolean!
+  key: String! @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+  labels: LocalizedTextInput!
+  order: Int! @constraint(min: 0, max: 10000)
+  parent: String @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+}
+
+"""A country the platform serves: configuration, not code."""
+type Country {
+  """An inactive country is out of the public lists."""
+  active: Boolean!
+  """ISO 3166-1 alpha-2, upper case."""
+  code: String!
+  """The international prefix, `+237`."""
+  dialCode: String!
+  """Keys of the document categories the country offers (CNI, PASSPORT…)."""
+  documentTypes: [String!]! @listSize(assumedSize: 30)
+  idNumberPatterns: [IdNumberPattern!]! @listSize(assumedSize: 30)
+  languages: [Language!]! @listSize(assumedSize: 2)
+  mapCenter: GeoPoint!
+  """The map's zoom level over the whole country, 1 to 18."""
+  mapZoom: Int!
+  """The name in the request's language."""
+  name: String!
+  """The name in each language, for the admin's form."""
+  names: LocalizedText!
+  """A regular expression an E.164 number of the country matches."""
+  phonePattern: String!
+}
+
 """An ISO 3166-1 alpha-2 country code, such as FR."""
 scalar CountryCode @specifiedBy(url: "https://www.iso.org/iso-3166-country-codes.html")
+
+input CountryInput {
+  active: Boolean! = true
+  code: String! @constraint(pattern: "^[A-Z]{2}$")
+  dialCode: String! @constraint(pattern: "^\\+[1-9][0-9]{0,3}$")
+  documentTypes: [String!]! @constraint(maxItems: 30)
+  idNumberPatterns: [IdNumberPatternInput!]! @constraint(maxItems: 30)
+  languages: [Language!]! @constraint(minItems: 1, maxItems: 2)
+  mapCenter: GeoPointInput!
+  mapZoom: Int! @constraint(min: 1, max: 18)
+  names: LocalizedTextInput!
+  phonePattern: String! @constraint(minLength: 1, maxLength: 200)
+}
 
 input CreateOrganisationInput {
   city: String! @constraint(minLength: 1, maxLength: 120)
@@ -233,6 +297,27 @@ enum ErrorParamKind {
 """A GUID: 8-4-4-4-12 hexadecimal digits, with no version check."""
 scalar GUID
 
+"""A point on the earth, in degrees."""
+type GeoPoint {
+  latitude: Latitude!
+  longitude: Longitude!
+}
+
+input GeoPointInput {
+  latitude: Latitude!
+  longitude: Longitude!
+}
+
+"""A place a provider found."""
+type GeocodeResult {
+  city: String
+  """ISO 3166-1 alpha-2, when the provider names a country."""
+  countryCode: String
+  """The provider's one-line name of the place."""
+  label: String!
+  point: GeoPoint!
+}
+
 """A CSS hsl() color, such as hsl(120, 100%, 50%)."""
 scalar HSL @specifiedBy(url: "https://www.w3.org/TR/css-color-4/#the-hsl-notation")
 
@@ -264,6 +349,21 @@ scalar IPv6 @specifiedBy(url: "https://www.rfc-editor.org/rfc/rfc4291")
 
 """An ISBN-10 or ISBN-13, digits only, with its check digit verified."""
 scalar ISBN @specifiedBy(url: "https://www.isbn-international.org/content/isbn-users-manual/29")
+
+"""
+The regular expression an ID number of one document type matches in a country.
+"""
+type IdNumberPattern {
+  """The key of a document category the country offers."""
+  documentType: String!
+  """A JavaScript regular expression, anchored."""
+  pattern: String!
+}
+
+input IdNumberPatternInput {
+  documentType: String! @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+  pattern: String! @constraint(minLength: 1, maxLength: 200)
+}
 
 """An invitation as it is issued."""
 type InviteMemberPayload {
@@ -308,6 +408,17 @@ scalar LocalTime
 
 """A BCP 47 language tag in canonical form, such as fr-FR."""
 scalar Locale @specifiedBy(url: "https://www.rfc-editor.org/rfc/rfc5646")
+
+"""A text in each language the platform speaks."""
+type LocalizedText {
+  en: String!
+  fr: String!
+}
+
+input LocalizedTextInput {
+  en: String! @constraint(minLength: 1, maxLength: 120)
+  fr: String! @constraint(minLength: 1, maxLength: 120)
+}
 
 """
 A signed 64-bit integer, as a decimal string (a safe-integer number is accepted as input).
@@ -364,6 +475,16 @@ type Mutation {
   """
   createOrganisation(input: CreateOrganisationInput!): Organisation!
   """
+  Adds a safe place. Needs the platform admin. A country that is unknown or
+  inactive is `config.errors.country-not-found` (400, on `countryCode`).
+  """
+  createSafePlace(input: SafePlaceInput!): SafePlace!
+  """
+  Archives a safe place, returning its id. Needs the platform admin;
+  `config.errors.safe-place-not-found` (404) for an unknown one.
+  """
+  deleteSafePlace(id: ID!): ID!
+  """
   Invites a phone number as `role`, or sends a new invitation to a phone already
   invited. Needs an administrator (the refusals of `organisationMembers`); a
   `phone` that is no number is `validation.errors.invalid-format` on `phone`, a
@@ -378,11 +499,31 @@ type Mutation {
   """
   removeMember(memberId: ID!, slug: String! @constraint(minLength: 2, maxLength: 63)): ID!
   """
+  Makes or replaces a category (stated whole). Needs the platform admin. A parent
+  that is unknown, not a root, the category itself, or of another document-ness
+  is `config.errors.category-parent-invalid` on `parent`.
+  """
+  setCategory(input: CategoryInput!): Category!
+  """
+  Makes or replaces a country (stated whole). Needs the platform admin (401,
+  403 `accounts.errors.suspended`, 403 `auth.errors.forbidden`). A document
+  type that is no live document category is `config.errors.document-type-unknown`
+  and a pattern that is no regular expression `validation.errors.invalid-format`,
+  each on its path of one `validation.errors.invalid-input`.
+  """
+  setCountry(input: CountryInput!): Country!
+  """
   Gives a member a role. Needs an administrator; `organisations.errors.member-not-found`
   (404) for a member of no such organisation, `organisations.errors.last-admin` (409)
   for the last administrator being demoted.
   """
   setMemberRole(memberId: ID!, role: OrganisationRole!, slug: String! @constraint(minLength: 2, maxLength: 63)): Member!
+  """
+  Replaces a safe place's fields (stated whole). Needs the platform admin; the
+  refusals of `createSafePlace`, `config.errors.safe-place-not-found` (404), and,
+  with `version`, `config.errors.stale-version` (409) when someone wrote first.
+  """
+  updateSafePlace(id: ID!, input: SafePlaceInput!, version: Int): SafePlace!
 }
 
 """A Nano ID: 21 characters of A-Z, a-z, 0-9, _ and -."""
@@ -500,6 +641,18 @@ scalar PositiveInt
 
 type Query {
   """
+  The categories of item in tree order (a root, then its children). Public.
+  `includeInactive` needs the platform admin, as for `countries`.
+  """
+  categories(includeInactive: Boolean = false): [Category!]! @listSize(assumedSize: 40)
+  """
+  The countries the platform serves, by code. Public. `includeInactive` needs the
+  platform admin (401, `accounts.errors.suspended` 403, `auth.errors.forbidden` 403).
+  """
+  countries(includeInactive: Boolean = false): [Country!]! @listSize(assumedSize: 20)
+  """One country by code, or null for an unknown or inactive one. Public."""
+  country(code: String! @constraint(pattern: "^[A-Z]{2}$")): Country
+  """
   Every API error message in a language (the request's language when none is
   given: `Accept-Language`, then `lang`, then the cookie, else French). Public:
   sign-in screens need it, so no viewer is asked for.
@@ -510,6 +663,13 @@ type Query {
   cached catalogue. Public.
   """
   errorCatalogueVersion(language: Language): String!
+  """
+  Places matching a text, through the geocoding provider (cached, one request
+  a second). Needs a signed-in, unsuspended account (the public provider is
+  spared the anonymous traffic). `config.errors.geocoding-unavailable` (503)
+  when the provider does not answer.
+  """
+  geocode(countryCode: String @constraint(pattern: "^[A-Z]{2}$"), first: Int = 5 @constraint(min: 1, max: 10), query: String! @constraint(minLength: 2, maxLength: 200)): [GeocodeResult!]! @listSize(assumedSize: 10)
   """
   An organisation the viewer works in. Needs an agent or an administrator of it:
   401 without a viewer, 403 `accounts.errors.suspended`, and 404
@@ -523,6 +683,15 @@ type Query {
   404 of `organisation`).
   """
   organisationMembers(after: String, first: Int = 20 @constraint(min: 1, max: 100), slug: String! @constraint(minLength: 2, maxLength: 63)): MemberConnection!
+  """
+  The place at a point, or null where the provider knows none. The same
+  guard and refusal as `geocode`.
+  """
+  reverseGeocode(point: GeoPointInput!): GeocodeResult
+  """The safe places, by city, optionally of one country or city. Public."""
+  safePlaces(after: String, city: String @constraint(minLength: 1, maxLength: 120), countryCode: String @constraint(pattern: "^[A-Z]{2}$"), first: Int = 20 @constraint(min: 1, max: 100)): SafePlaceConnection!
+  """The safe places within a radius of a point, nearest first. Public."""
+  safePlacesNear(countryCode: String @constraint(pattern: "^[A-Z]{2}$"), first: Int = 10 @constraint(min: 1, max: 50), point: GeoPointInput!, radiusM: Int = 5000 @constraint(min: 100, max: 100000)): [SafePlaceNear!]! @listSize(assumedSize: 50)
   """
   The signed-in account and its roles and organisations; null for an anonymous
   request. A suspended account is still answered, with `suspendedAt` set, so
@@ -545,6 +714,55 @@ scalar SHA512 @specifiedBy(url: "https://csrc.nist.gov/pubs/fips/180-4/upd1/fina
 
 """An integer from -9007199254740991 to 9007199254740991."""
 scalar SafeInt
+
+"""
+A place to hand an item over: a police station, or a partner organisation.
+"""
+type SafePlace {
+  city: String!
+  """ISO 3166-1 alpha-2."""
+  countryCode: String!
+  """Opening hours, free text; null when unknown."""
+  hours: String
+  id: ID!
+  kind: SafePlaceKind!
+  location: GeoPoint!
+  name: String!
+  """Passed back to `updateSafePlace` to lock the write."""
+  version: Int!
+}
+
+type SafePlaceConnection {
+  edges: [SafePlaceEdge!]! @listSize(assumedSize: 100)
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type SafePlaceEdge {
+  node: SafePlace!
+}
+
+input SafePlaceInput {
+  city: String! @constraint(minLength: 1, maxLength: 120)
+  countryCode: String! @constraint(pattern: "^[A-Z]{2}$")
+  hours: String @constraint(minLength: 1, maxLength: 200)
+  kind: SafePlaceKind!
+  location: GeoPointInput!
+  name: String! @constraint(minLength: 1, maxLength: 160)
+}
+
+"""Who keeps a safe place."""
+enum SafePlaceKind {
+  PARTNER_ORG
+  POLICE
+}
+
+"""A safe place and how far it is from the point asked."""
+type SafePlaceNear {
+  """The great-circle distance in metres."""
+  distanceM: Int!
+  place: SafePlace!
+}
 
 """A Semantic Versioning 2.0.0 version, such as 1.0.0-rc.1."""
 scalar SemVer @specifiedBy(url: "https://semver.org/spec/v2.0.0.html")
