@@ -607,7 +607,9 @@ input ListingNearInput {
 enum ListingOrder {
   """Newest day first."""
   DATE
-  """Nearest first; needs `near`, else newest day first."""
+  """
+  Nearest first among the 2 000 newest matches; needs `near`, else newest day first.
+  """
   DISTANCE
   """Best text match first; newest day first when there is no text."""
   RELEVANCE

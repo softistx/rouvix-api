@@ -1,6 +1,5 @@
 import { distanceM, type GeoPoint } from "@/modules/config";
-import { cityKeyOf, dayOfString } from "@/modules/listings/listings.utils";
-import type { ListingKind } from "@/modules/listings/models";
+import { cityKeyOf, dayOfString, type ListingKind } from "@/modules/listings";
 
 // A query reaches its first 500 results at most (the cap of the cursor), reads
 // 2 000 candidates to put them in order of distance, and the map reads 5 000
@@ -88,7 +87,9 @@ export function decodeCursor(after: string | null | undefined) {
       Buffer.from(after, "base64url").toString(),
     );
     const offset = (parsed as { o?: unknown } | null)?.o;
-    return Number.isInteger(offset) && (offset as number) >= 0
+    return Number.isInteger(offset) &&
+      (offset as number) >= 0 &&
+      (offset as number) <= MAX_DEPTH
       ? (offset as number)
       : undefined;
   } catch {

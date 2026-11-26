@@ -117,3 +117,25 @@ function grouped(members: MapPoint[]): Grouped {
     },
   };
 }
+
+// The stored `geo` of a listing inside the box, by range on its coordinates.
+export const inBox = (box: Box) => ({
+  "geo.coordinates.0": { $gte: box.west, $lte: box.east },
+  "geo.coordinates.1": { $gte: box.south, $lte: box.north },
+});
+
+// A stored listing as a map point, at its blurred `geo`.
+export const pointOf = (doc: {
+  _id: { toHexString(): string };
+  categoryKey: string;
+  documentType: string | null;
+  geo: { coordinates: readonly [number, number] };
+}): MapPoint => ({
+  id: doc._id.toHexString(),
+  categoryKey: doc.categoryKey,
+  documentType: doc.documentType,
+  point: {
+    latitude: doc.geo.coordinates[1],
+    longitude: doc.geo.coordinates[0],
+  },
+});

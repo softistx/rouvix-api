@@ -37,7 +37,7 @@ enum ListingOrder {
   RELEVANCE
   "Newest day first."
   DATE
-  "Nearest first; needs `near`, else newest day first."
+  "Nearest first among the 2 000 newest matches; needs `near`, else newest day first."
   DISTANCE
 }
 

@@ -8,7 +8,8 @@ import {
   circleTouches,
   clusterPoints,
   filterIssues,
-  type MapPoint,
+  inBox,
+  pointOf,
   widened,
   zoomOf,
 } from "../search.rules";
@@ -118,16 +119,3 @@ export class MapService {
     };
   }
 }
-
-// The stored `geo` of a listing inside the box, by range on its coordinates.
-const inBox = (box: Box) => ({
-  "geo.coordinates.0": { $gte: box.west, $lte: box.east },
-  "geo.coordinates.1": { $gte: box.south, $lte: box.north },
-});
-
-const pointOf = (doc: MapDoc): MapPoint => ({
-  id: doc._id.toHexString(),
-  categoryKey: doc.categoryKey,
-  documentType: doc.documentType,
-  point: fromGeoJson(doc.geo),
-});
