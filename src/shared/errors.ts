@@ -106,3 +106,7 @@ export const retryParams = (retryAfter: number) => ({
   retryAfter,
   minutes: Math.max(1, Math.ceil(retryAfter / 60)),
 });
+
+// An error as one log line's words: its name and message, or what was thrown.
+export const messageOf = (error: unknown): string =>
+  error instanceof Error ? `${error.name}: ${error.message}` : String(error);

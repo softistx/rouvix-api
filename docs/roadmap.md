@@ -27,6 +27,8 @@ tracking issue lists the v1 slices.
 ## Next
 
 - SMS and WhatsApp alerts.
+- A sweep that embeds the listings published while the embedder was down, and a
+  per-account limit on photo suggestions.
 - More countries of francophone Africa, by configuration.
 
 ## Later

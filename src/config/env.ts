@@ -150,6 +150,33 @@ const parsed = defineEnv({
       .refine(isPrivateServiceUrl, "not a private http(s) service URL")
       .transform((url) => url.replace(/\/+$/, "")),
   ),
+  // Claude, which suggests an object's description from its photo (spec
+  // §4.3): its API key and model. Unset, there is no suggestion
+  // (`ai.errors.suggestion-unavailable`) and the declare form works without one. The
+  // model is the newest the @softistx/ai-anthropic docs name.
+  ANTHROPIC_API_KEY: z
+    .string()
+    .transform((value) => value || undefined)
+    .pipe(z.string().min(1).optional())
+    .optional(),
+  ANTHROPIC_MODEL: z.string().min(1).default("claude-sonnet-5-5"),
+  // Claude calls a day, for the whole platform; past it, no suggestion.
+  CLAUDE_DAILY_CAP: z.coerce.number().int().min(0).default(200),
+  // The local Ollama (the `ollama-embed` service, `nomic-embed-text`) that
+  // embeds the listings' text: a service on this machine or its private
+  // network only. Unset, nothing is embedded and a search ranks by its text
+  // score alone.
+  OLLAMA_URL: z
+    .string()
+    .transform((value) => value || undefined)
+    .pipe(
+      z
+        .string()
+        .refine(isPrivateServiceUrl, "not a private http(s) service URL")
+        .transform((url) => url.replace(/\/+$/, ""))
+        .optional(),
+    )
+    .optional(),
   // The key ID documents' OCR fields are sealed with, and their numbers
   // hashed by: 32 random bytes in base64 (openssl rand -base64 32). Required
   // in production; unset elsewhere, a key of this process (lost at restart).

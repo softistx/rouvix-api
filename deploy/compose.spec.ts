@@ -92,6 +92,25 @@ describe("the deploy compose file", () => {
     expect(parsed.networks["internal"]?.internal).toBe(true);
   });
 
+  test("the embedder sees listing text only: on the internal network, no port, a model pulled by a one-shot on the edge", async () => {
+    const services = Object.fromEntries(await load(files.deploy));
+    expect(services["ollama-embed"]?.networks).toEqual(["internal"]);
+    expect(services["ollama-embed-pull"]?.networks).toEqual(["edge"]);
+    expect(services["ollama-embed-pull"]?.restart).toBe("no");
+    expect(services["api"]?.environment?.["OLLAMA_URL"]).toBe(
+      "http://rouvix-ollama:11434",
+    );
+  });
+
+  test("a model pull that fails does not fail the deploy: Ollama is optional", async () => {
+    const parsed = Bun.YAML.parse(await Bun.file(files.deploy).text()) as {
+      services: Record<string, { entrypoint?: string[] }>;
+    };
+    const script = parsed.services["ollama-embed-pull"]?.entrypoint?.join("\n");
+    expect(script).toContain("ollama pull nomic-embed-text ||");
+    expect(script).not.toMatch(/exit [1-9]/);
+  });
+
   test("the example env file holds no real secret", async () => {
     const text = await Bun.file("deploy/.env.example").text();
     const values = text

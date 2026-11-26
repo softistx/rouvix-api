@@ -15,6 +15,9 @@ delete Bun.env["REDIS_URL"];
 // the vault is a key of the run.
 delete Bun.env["OCR_URL"];
 delete Bun.env["ID_FIELDS_KEY"];
+// Nor a Claude key or an Ollama server: the AI specs inject `@softistx/ai-testing`'s fakes.
+delete Bun.env["ANTHROPIC_API_KEY"];
+delete Bun.env["OLLAMA_URL"];
 Bun.env["SMS_PROVIDER"] = "log";
 
 // Every collection and its indexes, before any spec, then the migrations and

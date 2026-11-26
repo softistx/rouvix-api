@@ -1,0 +1,54 @@
+"""
+What Claude proposed from the photo of an object, to show the author in the
+declare form, which they accept or edit: nothing is published from it.
+UNTRUSTED text, as the model wrote it: shown and edited as plain text, never as
+markup, a link or an instruction. The server bounds it to what a listing
+stores, removes markup, links and control characters, and keeps `categoryKey`
+only when it is an active root category that is not a document one.
+"""
+type ObjectSuggestion {
+  "An active, non-document root category; null when none fits."
+  categoryKey: String
+  "Up to 120 characters; may be empty when the model found nothing to say."
+  title: String!
+  "Up to 600 characters."
+  description: String!
+  "Colours (five at most), brand and marks, as `ListingAttributes` states them."
+  attributes: ListingAttributes!
+  "The version of the prompt that produced it."
+  promptVersion: Int!
+  "The version of the answer's schema."
+  schemaVersion: Int!
+}
+
+input SuggestFromPhotoInput {
+  "The media key of a photo the viewer uploaded to `/media/listing-photos`."
+  photoKey: ID!
+  "The country the item is declared in, for the local ID-like check."
+  countryCode: String! @constraint(pattern: "^[A-Z]{2}$")
+  """
+  The category the author chose before asking: an active root category that is
+  no document's. A document one is `ai.errors.document-photo`; an unknown,
+  inactive or non-root key is `listings.errors.category-invalid` on
+  `categoryKey`; nothing is read or sent either way.
+  """
+  categoryKey: String!
+    @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+}
+
+extend type Mutation {
+  """
+  A suggestion for the photo of an object (category, title, description,
+  colours, brand, marks). Needs a signed-in, unsuspended account.
+  Refusals: `ai.errors.document-photo` (422: a document category, an ID
+  photo's key, or a photo the server's own OCR finds ID-like; nothing is sent
+  to Claude; a document `categoryKey` too), `ai.errors.unavailable`
+  (503: the local check could not run), `ai.errors.suggestion-unavailable`
+  (503: Claude is down, has no key or the day's cap is reached: the declare
+  form goes on without a suggestion), `ai.errors.photo-not-found` (404: no such upload of
+  the viewer's), `listings.errors.category-invalid` (400, on `categoryKey`),
+  `config.errors.country-not-found` (400: `countryCode` is not
+  a country the platform serves).
+  """
+  suggestFromPhoto(input: SuggestFromPhotoInput!): ObjectSuggestion!
+}

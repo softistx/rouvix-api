@@ -3,6 +3,8 @@ import type { Mailer } from "@softistx/mail";
 import type { Viewer } from "@/auth/access";
 import type { Auth } from "@/auth/auth";
 import type { AppMongo } from "@/config/db";
+import type { ObjectDescriber } from "@/describer";
+import type { Embedder } from "@/embedder";
 import type { Geocoder } from "@/geocoder";
 import type { Ocr } from "@/ocr";
 import type { ImageRedactor } from "@/redactor";
@@ -11,14 +13,24 @@ import type { Now } from "@/shared/dates";
 import type { SmsSender } from "@/sms";
 import type { IdVault } from "@/vault";
 import { AccountsService } from "./accounts";
-import { RemotePhotoGuard } from "./ai";
+import {
+  EmbeddingsService,
+  RemotePhotoGuard,
+  SuggestionsService,
+  UsageService,
+} from "./ai";
 import {
   CategoriesService,
   CountriesService,
   GeocodingService,
   SafePlacesService,
 } from "./config";
-import { IdDocumentsService, ListingsService, PhotosService } from "./listings";
+import {
+  IdDocumentsService,
+  ListingEmbeddings,
+  ListingsService,
+  PhotosService,
+} from "./listings";
 import {
   MembersService,
   OrganisationRelations,
@@ -45,6 +57,12 @@ export interface ServiceDeps {
   redactor: ImageRedactor;
   vault: IdVault;
   background: Pick<Background, "run">;
+  // The AI ports, passed explicitly: Claude's object describer (spec §4.3,
+  // reached through the remote photo guard only) and the local embedder, and
+  // the day's cap of Claude calls (spec §5.5).
+  describer: ObjectDescriber;
+  embedder: Embedder;
+  claudeDailyCap: number;
   // How a text search puts its matches in order, passed explicitly.
   ranker: ListingRanker;
 }
@@ -69,26 +87,47 @@ export function services(deps: ServiceDeps & { viewer: Viewer | null }) {
     pause,
   });
   const photos = new PhotosService(mongo, rest.media, documents, pause);
+  // The embedding job runs after a listing's photo job (listings.service.ts),
+  // and reads the listing it embeds: the closure is called after both exist.
+  const indexing = { index: (id: string) => embeddings.index(id) };
   const listings = new ListingsService(mongo, {
     countries,
     categories,
     photos,
     now: rest.now,
     background: rest.background,
+    indexing,
+  });
+  const embeddings = new EmbeddingsService({
+    embedder: rest.embedder,
+    listings,
+    vectors: new ListingEmbeddings(mongo),
+    pause,
+  });
+  const remotePhotos = new RemotePhotoGuard({
+    ocr: rest.ocr,
+    categories,
+    countries,
+    idPhoto: (key) => listings.isIdPhoto(key),
+    now: rest.now,
   });
   return {
     countries,
     categories,
     photos,
     listings,
-    // The gate of every call that would send a photo off the VPS (the object
-    // describer's, a later slice): an ID document's never passes.
-    remotePhotos: new RemotePhotoGuard({
-      ocr: rest.ocr,
+    // The gate of every call that would send a photo off the VPS: an ID
+    // document's never passes, and the object describer is behind it.
+    remotePhotos,
+    suggestions: new SuggestionsService({
+      guard: remotePhotos,
+      describer: rest.describer,
+      usage: new UsageService(mongo, {
+        now: rest.now,
+        dailyCap: rest.claudeDailyCap,
+      }),
+      photos,
       categories,
-      countries,
-      idPhoto: (key) => listings.isIdPhoto(key),
-      now: rest.now,
     }),
     search: new SearchService(mongo, { now: rest.now, ranker: rest.ranker }),
     map: new MapService(mongo, { now: rest.now }),

@@ -113,6 +113,19 @@ export const listings = defineCollection({
         }),
       )
       .max(3),
+    // The vector of the listing's text (title, description, attributes), made
+    // on this machine by the embedding job (spec §4.4) and compared by the
+    // search's ranker: the model it came from and the hash of the text, so a
+    // text that did not change is not embedded again. Never returned, and
+    // never set for an ID document.
+    embedding: z
+      .object({
+        model: z.string().min(1).max(60),
+        textHash: z.string().regex(/^[0-9a-f]{64}$/),
+        vector: z.array(z.number()).length(768),
+      })
+      .nullable()
+      .default(null),
     status: listingStatus,
     closedReason: closeReason.nullable().default(null),
     closedAt: z.date().nullable().default(null),

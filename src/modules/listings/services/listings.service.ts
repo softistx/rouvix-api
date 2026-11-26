@@ -51,6 +51,9 @@ export interface ListingDeps {
   now: Now;
   // Runs what nobody waits for after the answer (the photo job).
   background: { run(name: string, task: () => Promise<unknown>): void };
+  // The embedding job (src/modules/ai), run after the photo job: it never
+  // throws, a listing it could not embed is searched by its words.
+  indexing: { index(listingId: string): Promise<void> };
 }
 
 // The listings: the declaration of a lost or a found item (spec §5.3). Writes
@@ -176,6 +179,9 @@ export class ListingsService {
         ...fields,
         ...publishing,
         ...(again && NO_ID_FIELDS),
+        // An ID document's text is never embedded: a listing turned into one
+        // loses the vector it had.
+        ...(content.documentType && { embedding: null }),
         version,
       });
       await this.deps.photos.discard(removed);
@@ -234,6 +240,7 @@ export class ListingsService {
       await this.mongo.as(viewer.id).db.listings.update(id, {
         status: "REMOVED",
         photos: [],
+        embedding: null,
         ...NO_ID_FIELDS,
         version: listing.version,
       });
@@ -267,18 +274,23 @@ export class ListingsService {
     };
   }
 
-  // Starts the photo job for a published listing that waits for it. A draft is
-  // private: its photos settle when it is published.
+  // Starts the jobs of a published listing, which nobody waits for: the photo
+  // job when photos wait for it, then the embedding job, which embeds the text
+  // of a listing that is open by then. A draft is private: its photos settle
+  // and its text is embedded when it is published.
   private settleLater(listing: ListingDocument) {
-    const waiting = listing.status === "PENDING";
+    if (listing.status === "DRAFT") return;
     const photos =
-      listing.status !== "DRAFT" &&
+      listing.status === "PENDING" ||
       listing.photos.some((photo) => photo.status === "PENDING");
-    if (!waiting && !photos) return;
     const id = listing._id.toHexString();
-    this.deps.background.run("listing photos", () =>
-      this.deps.photos.settleWithRetry(id),
-    );
+    this.deps.background.run("listing jobs", async () => {
+      try {
+        if (photos) await this.deps.photos.settleWithRetry(id);
+      } finally {
+        await this.deps.indexing.index(id);
+      }
+    });
   }
 
   // The stored fields of a content, once checked: one `invalid-input` with

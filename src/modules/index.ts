@@ -1,4 +1,5 @@
 import { accounts } from "./accounts";
+import { ai } from "./ai";
 import { config } from "./config";
 import { listings } from "./listings";
 import { organisations } from "./organisations";
@@ -8,6 +9,7 @@ import { translationResolvers } from "./translations";
 // The registry: every module's resolvers, merged by graxia per type and field.
 export const resolvers = [
   accounts,
+  ai,
   config,
   listings,
   organisations,

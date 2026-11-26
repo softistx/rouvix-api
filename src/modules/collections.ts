@@ -5,12 +5,14 @@
 // Tenancy) are translations' `translations`, which migrations write, the startup
 // load reads and a request never does, and config's `countries`, `categories`
 // and `safePlaces`: platform data, seeded by migrations, read by every request
-// and edited by the platform admin. The listings' `listings` and `listingUploads`
+// and edited by the platform admin, and ai's `aiUsage`, the day's count of Claude
+// calls, moved by atomic increments of the usage service alone. The listings' `listings` and `listingUploads`
 // are platform data too: an account's own, owned by its author (`authorId`), with
 // an optional `orgId` for an organisation's register (not a tenant field). `organisations` is the tenant itself; every
 // other collection is organisation-owned (janus keeps its own,
 // src/config/janus-sync.ts).
 
+export { aiUsage } from "./ai/models";
 export { categories, countries, safePlaces } from "./config/models";
 export { listings, listingUploads } from "./listings/models";
 export { members, organisations } from "./organisations/models";

@@ -2,10 +2,10 @@
 
 ## The stack
 
-`deploy/docker-compose.yaml` runs seven containers on the VPS: `mongo` (a one-node replica set,
+`deploy/docker-compose.yaml` runs nine containers on the VPS: `mongo` (a one-node replica set,
 auth on), `mongo-init` (creates the two users), `redis`, `s3` (the private bucket's gateway),
-`ocr` (the Tesseract sidecar, built from `docker/ocr`), `api-migrate` (db:sync then db:migrate)
-and `api`. Every service, one-shots included, has
+`ocr` (the Tesseract sidecar, built from `docker/ocr`), `ollama-embed` (the embedder) with its
+one-shot `ollama-embed-pull`, `api-migrate` (db:sync then db:migrate) and `api`. Every service, one-shots included, has
 `deploy.resources.limits`; the healthchecks are a TCP or HTTP check in the image's own tools
 (`deploy/compose.spec.ts` keeps both true of every service added later). No service publishes a
 port and the API has no hostname: rouvix-ui's container joins the external `edge` network and
@@ -32,6 +32,25 @@ bytes, `openssl rand -base64 32`, in `deploy/.env`); keep a copy of it apart, si
 cannot be read without it, and numbers are hashed with it for matching. With the sidecar down, a
 document's photo is still blurred and its listing opens with no number; an object's photo the OCR
 could not check is treated as an ID's (shown blurred).
+
+## Claude and the embeddings
+
+Two AI services, both optional: the API runs, the declare form and the search work, without either.
+
+- **Claude** suggests an object's description from its photo (`suggestFromPhoto`, spec §4.3). Set
+  `ANTHROPIC_API_KEY` in `deploy/.env` (empty means no suggestion: `ai.errors.suggestion-unavailable`).
+  `ANTHROPIC_MODEL` defaults to the newest model the `@softistx/ai-anthropic` docs name. The call is
+  counted in `aiUsage` (one document per UTC day: calls and tokens) and refused past
+  `CLAUDE_DAILY_CAP` calls a day for the whole platform (default 200, `0` turns it off). Read the day's
+  use with `db.aiUsage.find().sort({_id: -1})`. Only an object's photo goes to Claude, through the
+  remote photo guard: a document category, an ID photo's key or a photo the local OCR finds ID-like
+  is refused first, and an OCR that is down refuses the photo too (fail closed).
+- **Ollama** (`ollama-embed`, `nomic-embed-text`, 768 dimensions) embeds each open listing's title,
+  description and attributes (never an ID document's) in the background, and the search embeds its text
+  query, to re-rank the matches by meaning. It sees text only and sits on `internal` with no egress; the
+  model comes from `ollama-embed-pull`, a one-shot on `edge`, into the `ollama-data` volume. Down, a
+  listing simply has no vector yet and a search ranks by its words. A listing published while Ollama was
+  down is embedded the next time it is edited; a backfill sweep is a later item (docs/roadmap.md).
 
 ## Probes
 

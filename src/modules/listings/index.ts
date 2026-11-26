@@ -6,6 +6,7 @@ export { listingResolvers as listings } from "./resolvers";
 export {
   IdDocumentsService,
   type ListingDocument,
+  ListingEmbeddings,
   ListingMedia,
   ListingsService,
   PhotosService,

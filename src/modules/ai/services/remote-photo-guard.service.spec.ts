@@ -5,7 +5,7 @@ import { jpegOf } from "~/images";
 import { documentContent, foundContent, listingsAs, photoOf } from "~/listings";
 import { fakeCniLines } from "~/ocr";
 import { refusal } from "~/refusals";
-import type { RemotePhoto } from "./ai.service";
+import type { RemotePhoto } from "./remote-photo-guard.service";
 
 // The gate of every call that would send a photo off the VPS (AGENTS.md, "ID
 // documents never leave the VPS"): a spy stands for the remote service, and
@@ -114,6 +114,22 @@ describe("the remote photo guard", () => {
     );
     expect(error.extensions["code"]).toBe("ai.errors.document-photo");
     expect(kit.ocr.images).toHaveLength(1);
+    expect(remote.sent).toEqual([]);
+  });
+
+  test("refuses a country the platform does not serve, whose number patterns would be off", async () => {
+    const me = await listingsAs(kit);
+    const remote = remoteSpy();
+    kit.ocr.answer(["NOM/SURNAME", "ESSAI", "N° 9907315846"]);
+    for (const countryCode of ["ZZ", "FR"]) {
+      const error = await refusal(
+        me.services.remotePhotos.send(
+          await photo({ countryCode }),
+          remote.call,
+        ),
+      );
+      expect(error.extensions["code"]).toBe("config.errors.country-not-found");
+    }
     expect(remote.sent).toEqual([]);
   });
 

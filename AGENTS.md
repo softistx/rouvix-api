@@ -21,7 +21,12 @@ plugin's (`build-an-alxia-graphql-api`, `add-a-module`, its `conventions-reviewe
   another organisation gets `not-found`.
 - **ID documents never leave the VPS**: their photos go to the local OCR and blur only,
   never to Claude or any other remote service; a guard refuses the call and a spec
-  proves it. The original photo is private and deleted when the listing closes.
+  proves it. The original photo is private and deleted when the listing closes. The guard
+  is a heuristic: the local OCR cannot tell an ID photo with no readable text (blurred,
+  angled, a card seen from its back) from an object's, so `suggestFromPhoto` also requires
+  the author's own `categoryKey`, an active root that is no document's, before anything is
+  sent; the photo's pixels are then the author's word against ours, and the prompt (empty
+  fields, title `Document`) is the last backstop. That residual risk is accepted.
 - **Masked by default**: no resolver returns a full ID number, a holder's full name, a
   phone number or an original ID photo to anyone but the person entitled to it (see
   spec §8); a leak spec per module guards it.
@@ -33,9 +38,9 @@ plugin's (`build-an-alxia-graphql-api`, `add-a-module`, its `conventions-reviewe
 ## Source layout
 
 `src/` has the entry points at its root (`server.ts`, `app.ts`, its spec) and a folder per
-concern: `config` (env, db, redis, sms, auth), `http` (context, schema, csrf, limits),
+concern: `config` (env, db, redis, sms, auth, ai), `http` (context, schema, csrf, limits),
 `auth` (`auth.ts` janus, `access.ts`, `guards.ts`), `tenancy` (`scoped()`, the directory),
-`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder`, `throttle`, `storage`, `ocr`
+`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder`, `describer`, `embedder`, `throttle`, `storage`, `ocr`
 (with the readers of OCR text: the zone, the ID-like check), `redactor` and `vault` (the ports'
 adapters), `shared`,
 `migrations` (with its `kit/`), `scripts` and `modules`. A module is `modules/<name>/`:
@@ -70,7 +75,7 @@ of a service, a resolver or a data-loader: it goes to the module's `utils`, `rul
 
 ## Ports
 
-`SmsSender` (`src/sms`: the log adapter, Africa's Talking), `Mailer`, `Geocoder`, `Throttle` (`src/throttle`: Redis rate limits, fail open for visitor reads; `memoryThrottle` in `test/throttle.ts`), the search's `ListingRanker` (plain text ranking until slice 6's embeddings) the photos' `MediaBucket` (`src/storage`), and the ID document pipeline's `Ocr` (`src/ocr`: the Tesseract sidecar of `docker/ocr`, its `OCR_URL` refused unless private; `fakeOcr` in `test/ocr.ts`), `ImageRedactor` (`src/redactor`: the whole photo blurred in process) and `IdVault` (`src/vault`: `ID_FIELDS_KEY`) are passed explicitly
+`SmsSender` (`src/sms`: the log adapter, Africa's Talking), `Mailer`, `Geocoder`, `Throttle` (`src/throttle`: Redis rate limits, fail open for visitor reads; `memoryThrottle` in `test/throttle.ts`), the search's `ListingRanker` (`textRanker`, or `embeddingRanker` of `src/modules/ai` when `OLLAMA_URL` is set), `ObjectDescriber` (`src/describer`: Claude through `@softistx/ai-anthropic`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `CLAUDE_DAILY_CAP`; reached through `RemotePhotoGuard` only), `Embedder` (`src/embedder`: Ollama `nomic-embed-text` through `@softistx/ai-ollama`, `OLLAMA_URL` refused unless private; `fakeClaude` and `fakeOllama` in `test/ai.ts`), the photos' `MediaBucket` (`src/storage`), and the ID document pipeline's `Ocr` (`src/ocr`: the Tesseract sidecar of `docker/ocr`, its `OCR_URL` refused unless private; `fakeOcr` in `test/ocr.ts`), `ImageRedactor` (`src/redactor`: the whole photo blurred in process) and `IdVault` (`src/vault`: `ID_FIELDS_KEY`) are passed explicitly
 and never defaulted but by `createApp`, from the environment (`SMS_PROVIDER`; the log adapter is
 refused in production). A spec passes `memorySmsSender` (`test/sms.ts`) and the memory mailer.
 
@@ -136,6 +141,8 @@ is held in a SCREAMING_SNAKE_CASE constant. Assert `extensions.code`, never the 
   most, which drops EXIF, GPS and XMP; the original is never stored. A listing carries only keys its
   author uploaded (`listingUploads`), each once. `Photo.status` is settled after the write by the
   background job (`PhotosService.settle`); a photo missing from the bucket is dropped.
+- Photo suggestions (`suggestFromPhoto`) are limited by the platform-wide `CLAUDE_DAILY_CAP` only: one
+  account can spend the day's budget (a per-account limit on the Throttle port is on the roadmap).
 - Specs use `test/bucket.ts` (an in-memory bucket) and drawn pictures (`test/images.ts`), never a
   real photo or ID image.
 - Writes of a listing replace its content whole (a field given is the new value) under `version`,

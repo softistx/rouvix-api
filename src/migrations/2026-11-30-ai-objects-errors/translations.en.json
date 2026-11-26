@@ -1,0 +1,4 @@
+{
+  "ai.errors.photo-not-found": "This photo was not found: upload it again.",
+  "ai.errors.suggestion-unavailable": "No suggestion is available right now: go on without one."
+}

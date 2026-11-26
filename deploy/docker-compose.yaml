@@ -1,8 +1,8 @@
 # ── rouvix-api, on the VPS ────────────────────────────────────────────────────
 #
-# One stack, seven containers: mongo (a one-node replica set, auth on), its
-# one-shot init, redis, an S3 gateway, the OCR sidecar, the API with its
-# migration one-shot.
+# One stack, nine containers: mongo (a one-node replica set, auth on), its
+# one-shot init, redis, an S3 gateway, the OCR sidecar, the embedder with its
+# model one-shot, the API with its migration one-shot.
 # Run it with `bun deploy/deploy.ts` (build, migrate, up, prune); by hand, from
 # this folder:
 #
@@ -14,6 +14,8 @@
 #   proxy secret (API_PROXY_SECRET). mongo, redis, the S3 gateway and the OCR
 #   sidecar are on `internal` alone, which has no egress: an ID document's
 #   photo, which only the OCR and the API's own blur see, cannot leave the VPS.
+#   The embedder (ollama-embed) is on `internal` too: it sees listing text only,
+#   never a photo; its model is pulled by a one-shot that is on `edge` alone.
 # - Every service, one-shots included, has `deploy.resources.limits`, sized to
 #   what it really uses with headroom; healthchecks are a TCP or HTTP check
 #   written in the image's own tools (no mongosh or bun run every few seconds).
@@ -45,6 +47,7 @@ volumes:
   mongo-data:
   redis-data:
   s3-data:
+  ollama-data:
 
 x-common: &common
   restart: unless-stopped
@@ -67,6 +70,11 @@ x-limits-half: &limits-half
     limits:
       cpus: "0.5"
       memory: 512M
+x-limits-embed: &limits-embed
+  resources:
+    limits:
+      cpus: "2"
+      memory: 2G
 x-limits-small: &limits-small
   resources:
     limits:
@@ -99,6 +107,12 @@ x-api-env: &api-env
   # what it sealed is gone; rotate it only with the listings' fields re-read.
   OCR_URL: http://rouvix-ocr:8884
   ID_FIELDS_KEY: ${ID_FIELDS_KEY:?}
+  # The local embedder, on `internal`: unset or down, a search ranks by its
+  # words alone. Claude, for the object suggestions: with no key there is none
+  # (the declare form works without); the cap is calls a day, platform wide.
+  OLLAMA_URL: http://rouvix-ollama:11434
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  CLAUDE_DAILY_CAP: ${CLAUDE_DAILY_CAP:-200}
 
 services:
   # ── data ────────────────────────────────────────────────────────────────────
@@ -299,6 +313,58 @@ services:
       start_period: 10s
       timeout: 3s
       retries: 3
+
+  # The local embedder (spec §4.4): Ollama with nomic-embed-text, which embeds
+  # the listings' text (never a photo). On `internal` alone, no egress: the model
+  # is already in the volume, put there by `ollama-embed-pull`.
+  ollama-embed:
+    <<: *common
+    networks: [internal]
+    image: ollama/ollama:0.13.0
+    container_name: rouvix-ollama
+    deploy: *limits-embed
+    depends_on:
+      ollama-embed-pull:
+        condition: service_completed_successfully
+    environment:
+      OLLAMA_KEEP_ALIVE: 30m
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/11434"]
+      interval: 30s
+      start_interval: 2s
+      start_period: 20s
+      timeout: 3s
+      retries: 5
+
+  # One-shot: starts a server of its own on `edge` (the only network with
+  # egress), pulls the model into the volume (a no-op once it is there) and
+  # exits. It never serves the API, and it never fails the deploy: Ollama is
+  # optional (a search ranks by its words without it), so a pull that fails is
+  # a warning and the one-shot still completes.
+  ollama-embed-pull:
+    <<: *oneshot
+    networks: [edge]
+    image: ollama/ollama:0.13.0
+    container_name: rouvix-ollama-pull
+    deploy: *limits-embed
+    volumes:
+      - ollama-data:/root/.ollama
+    entrypoint:
+      - sh
+      - -c
+      - |
+        ollama serve >/dev/null 2>&1 &
+        n=0
+        until ollama list >/dev/null 2>&1; do
+          n=$$((n + 1))
+          [ "$$n" -ge 60 ] && { echo "ollama-embed-pull: no server after 60 s, skipped" >&2; exit 0; }
+          sleep 1
+        done
+        ollama pull nomic-embed-text || echo "ollama-embed-pull: the model was not pulled, searches rank by their words" >&2
 
   # ── the API ─────────────────────────────────────────────────────────────────
   api-migrate:
