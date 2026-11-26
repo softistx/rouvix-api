@@ -4,6 +4,7 @@ export { cityKeyOf, dayOfString } from "./listings.utils";
 export type { ListingKind } from "./models";
 export { listingResolvers as listings } from "./resolvers";
 export {
+  IdDocumentsService,
   type ListingDocument,
   ListingMedia,
   ListingsService,

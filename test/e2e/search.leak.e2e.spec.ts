@@ -112,6 +112,8 @@ describe("what a visitor's search and map answer", () => {
       photoKeys: [key],
       place: { ...lostContent().place, city: "Marie Ngono" },
     });
+    // Its photo is processed (blurred) before it is public.
+    await kit.auth.background.settled();
     for (const text of [
       "Imaginaire",
       "000000000",

@@ -5,21 +5,28 @@ import { createApp } from "@/app";
 import { createAuth } from "@/auth/auth";
 import { mongo } from "@/config/db";
 import { clientHeader } from "@/http/csrf";
+import { localRedactor } from "@/redactor";
 import type { Throttle } from "@/throttle";
+import { ephemeralIdVault } from "@/vault";
 import { memoryBucket } from "~/bucket";
 import { fakeGeocoder } from "~/geocoder";
+import { fakeOcr } from "~/ocr";
 import { memorySmsSender } from "~/sms";
 
 // The app with the REAL janus, its stores in the test database: a memory
 // mailer and SMS sender whose outboxes a spec reads, a fixed clock it moves
-// (sessions expire by it) and a cheap hasher. Each call builds its own, so a
-// spec moving its clock moves no other's.
+// (sessions expire by it) and a cheap hasher; the fake OCR (it reads no word
+// unless told), the real in-process blur and a vault of its own key. Each call
+// builds its own, so a spec moving its clock moves no other's.
 export function authApp(options: { throttle?: Throttle } = {}) {
   const clock = fixedClock(Date.now());
   const mailer = createMemoryMailer();
   const sms = memorySmsSender();
   const geocoder = fakeGeocoder();
   const storage = memoryBucket();
+  const ocr = fakeOcr();
+  const redactor = localRedactor();
+  const vault = ephemeralIdVault();
   const auth = createAuth({
     db: mongo.db,
     clock,
@@ -31,6 +38,9 @@ export function authApp(options: { throttle?: Throttle } = {}) {
     mailer,
     geocoder,
     media: storage.bucket,
+    ocr,
+    redactor,
+    vault,
     ...(options.throttle && { throttle: options.throttle }),
     now: () => new Date(clock.now()),
   });
@@ -45,7 +55,19 @@ export function authApp(options: { throttle?: Throttle } = {}) {
         ...(language && { "accept-language": language }),
       },
     });
-  return { auth, app, mailer, sms, geocoder, storage, clock, client };
+  return {
+    auth,
+    app,
+    mailer,
+    sms,
+    geocoder,
+    storage,
+    ocr,
+    redactor,
+    vault,
+    clock,
+    client,
+  };
 }
 
 export type AuthApp = ReturnType<typeof authApp>;

@@ -98,3 +98,30 @@ export function webpChunks(bytes: Uint8Array): string[] {
   }
   return out;
 }
+
+/**
+ * A drawn card, `width` x `height`: a pale ground with rows of black and white
+ * bars like lines of print, all sharp edges. Nobody's document: a pattern.
+ */
+export function drawnCardPng(width: number, height: number): Uint8Array {
+  const header = new Uint8Array(13);
+  const view = new DataView(header.buffer);
+  view.setUint32(0, width);
+  view.setUint32(4, height);
+  header.set([8, 0, 0, 0, 0], 8);
+  const rows = new Uint8Array(height * (1 + width));
+  for (let y = 0; y < height; y++) {
+    const printed = Math.floor(y / 12) % 2 === 1;
+    for (let x = 0; x < width; x++) {
+      rows[y * (1 + width) + 1 + x] =
+        printed && Math.floor(x / 3) % 2 === 0 ? 10 : 235;
+    }
+  }
+  const parts = [
+    new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(rows)),
+    chunk("IEND", new Uint8Array(0)),
+  ];
+  return Uint8Array.from(parts.flatMap((p) => [...p]));
+}

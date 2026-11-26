@@ -8,6 +8,11 @@ import { serverAuth } from "./config/auth";
 import { mongo } from "./config/db";
 import { env } from "./config/env";
 import { serverGeocoder } from "./config/geocoder";
+import {
+  serverIdVault,
+  serverOcr,
+  serverRedactor,
+} from "./config/id-documents";
 import { serverMedia } from "./config/media";
 import { redis } from "./config/redis";
 import { serverSms } from "./config/sms";
@@ -20,9 +25,12 @@ import { noStoreMiddleware } from "./http/no-store";
 import { serverMailer } from "./mail/mailer";
 import { type ListingRanker, textRanker } from "./modules/search";
 import { cataloguesLoaded } from "./modules/translations";
+import type { Ocr } from "./ocr";
+import type { ImageRedactor } from "./redactor";
 import type { Now } from "./shared/dates";
 import type { SmsSender } from "./sms";
 import { organisationDirectory } from "./tenancy";
+import type { IdVault } from "./vault";
 
 export type AppOptions = Partial<Omit<BaseOptions, "trusted">> & {
   auth?: Auth;
@@ -30,6 +38,9 @@ export type AppOptions = Partial<Omit<BaseOptions, "trusted">> & {
   geocoder?: Geocoder;
   ranker?: ListingRanker;
   media?: MediaBucket;
+  ocr?: Ocr;
+  redactor?: ImageRedactor;
+  vault?: IdVault;
   mailer?: Mailer;
   catalogues?: () => boolean;
   now?: Now;
@@ -38,19 +49,34 @@ export type AppOptions = Partial<Omit<BaseOptions, "trusted">> & {
 
 // The app's entry point, where the ports are defaulted to the server's own
 // (janus for the viewer and its access, the SMS adapter and the mailer chosen
-// by the environment) so a spec injects only what it fakes. Everything below
-// receives them explicitly.
+// by the environment, the local OCR, blur and vault of the ID documents) so a
+// spec injects only what it fakes. Everything below receives them explicitly.
 export function createApp(options: AppOptions = {}) {
   const auth = options.auth ?? serverAuth();
   const sms = options.sms ?? serverSms();
   const geocoder = options.geocoder ?? serverGeocoder();
   const ranker = options.ranker ?? textRanker;
   const media = options.media ?? serverMedia;
+  const ocr = options.ocr ?? serverOcr();
+  const redactor = options.redactor ?? serverRedactor();
+  const vault = options.vault ?? serverIdVault();
   const mailer = options.mailer ?? serverMailer(env.MAIL_URL);
   const cataloguesReady = options.catalogues ?? cataloguesLoaded;
   const now = options.now ?? (() => new Date());
   const access = options.access ?? janusAccess(auth);
-  const deps = { mongo, auth, sms, mailer, geocoder, media, ranker, now };
+  const deps = {
+    mongo,
+    auth,
+    sms,
+    mailer,
+    geocoder,
+    media,
+    ocr,
+    redactor,
+    vault,
+    ranker,
+    now,
+  };
   return createBase({
     resolveViewer: options.resolveViewer ?? janusViewer(auth),
     access,

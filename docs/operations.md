@@ -2,9 +2,10 @@
 
 ## The stack
 
-`deploy/docker-compose.yaml` runs six containers on the VPS: `mongo` (a one-node replica set,
+`deploy/docker-compose.yaml` runs seven containers on the VPS: `mongo` (a one-node replica set,
 auth on), `mongo-init` (creates the two users), `redis`, `s3` (the private bucket's gateway),
-`api-migrate` (db:sync then db:migrate) and `api`. Every service, one-shots included, has
+`ocr` (the Tesseract sidecar, built from `docker/ocr`), `api-migrate` (db:sync then db:migrate)
+and `api`. Every service, one-shots included, has
 `deploy.resources.limits`; the healthchecks are a TCP or HTTP check in the image's own tools
 (`deploy/compose.spec.ts` keeps both true of every service added later). No service publishes a
 port and the API has no hostname: rouvix-ui's container joins the external `edge` network and
@@ -19,6 +20,18 @@ bun deploy/deploy.ts                       # build, migrate, up, prune the old i
 `bun deploy/deploy.ts` is idempotent: a rerun with nothing changed rebuilds from cache, migrates
 nothing and recreates no container. The `api` refuses to start on a pending migration, so a
 deployment is not zero-downtime.
+
+## ID documents
+
+An ID document's photo never leaves the VPS (spec §4.2): the API reads it with the `ocr` sidecar
+(Tesseract, French and English, `POST /ocr` with a PNG, on the `internal` network alone, which has
+no egress; read-only, the photo on standard input, never written) and blurs it whole in its own
+process. `OCR_URL` must name a private service (localhost, a private address or a container name):
+the API refuses to start otherwise. What the OCR read is sealed with `ID_FIELDS_KEY` (32 random
+bytes, `openssl rand -base64 32`, in `deploy/.env`); keep a copy of it apart, since what it sealed
+cannot be read without it, and numbers are hashed with it for matching. With the sidecar down, a
+document's photo is still blurred and its listing opens with no number; an object's photo the OCR
+could not check is treated as an ID's (shown blurred).
 
 ## Probes
 

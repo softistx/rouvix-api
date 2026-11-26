@@ -15,7 +15,8 @@ beforeEach(async () => {
 
 const EVERYTHING = `{
   id kind categoryKey countryCode documentType title description date status
-  photoKeys publishedAt expiresAt organisationSlug
+  photoKeys blurredPhotoKeys maskedNumber holderHint
+  publishedAt expiresAt organisationSlug
   attributes { colours brand marks }
   place { label radiusM keptAt point { latitude longitude } }
 }`;
@@ -86,7 +87,7 @@ describe("the masked view", () => {
     expect(text).not.toContain(me.viewer.id);
   });
 
-  test("an ID document: no free text, no attribute, no photo, whatever its author wrote", async () => {
+  test("an ID document: no free text, no attribute, no photo of its own, whatever its author wrote", async () => {
     const me = await listingsAs(kit);
     const key = await photoOf(kit, me.token);
     const content = lostContent({
@@ -102,14 +103,16 @@ describe("the masked view", () => {
       { ...content, kind: "LOST", publish: true },
       null,
     );
-    // Published at once (its photo is held back, never served), masked.
-    expect(declared.status).toBe("OPEN");
+    // Pending until its photo is processed, then public, masked.
+    expect(declared.status).toBe("PENDING");
+    await kit.auth.background.settled();
     const text = await visitorReads(declared._id.toHexString());
     expect(text).toContain('"documentType":"CNI"');
     expect(text).toContain('"title":null');
     expect(text).toContain('"description":null');
     expect(text).toContain('"attributes":null');
     expect(text).toContain('"photoKeys":[]');
+    expect(text).toMatch(/"blurredPhotoKeys":\["[0-9a-f-]{36}"\]/);
     for (const secret of [
       "Marché de test",
       "Personne Imaginaire",

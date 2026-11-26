@@ -1,12 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import {
   addDays,
+  blurredKeysOf,
   blurredPoint,
   cityKeyOf,
   dateString,
   dayOf,
   dayOfString,
+  objectKeysOf,
   publicPoint,
+  sameItems,
   searchPoint,
   searchTextOf,
 } from "./listings.utils";
@@ -110,5 +113,37 @@ describe("what search reads of a listing", () => {
         attributes: { colours: [] },
       }),
     ).toBe("Sac");
+  });
+});
+
+const K1 = "00000000-0000-4000-8000-000000000001";
+const K2 = "00000000-0000-4000-8000-000000000002";
+const B1 = "00000000-0000-4000-8000-0000000000b1";
+
+describe("the photo helpers", () => {
+  test("blurredKeysOf keeps the blurred copies only", () => {
+    expect(
+      blurredKeysOf([{ blurredKey: null }, { blurredKey: B1 }, {}]),
+    ).toEqual([B1]);
+  });
+
+  test("objectKeysOf names each rendition and each blurred copy", () => {
+    expect(
+      objectKeysOf([
+        { key: K1, blurredKey: B1 },
+        { key: K2, blurredKey: null },
+      ]),
+    ).toEqual([
+      `listing-photos/${K1}/full`,
+      `listing-photos/${K2}/full`,
+      `listing-blurred/${B1}`,
+    ]);
+  });
+
+  test("sameItems compares photo by photo", () => {
+    const a = { key: K1, status: "READY" as const, blurredKey: null };
+    expect(sameItems([a], [{ ...a }])).toBe(true);
+    expect(sameItems([a], [{ ...a, blurredKey: B1 }])).toBe(false);
+    expect(sameItems([a], [])).toBe(false);
   });
 });

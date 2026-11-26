@@ -67,11 +67,15 @@ describe("declare", () => {
       null,
     );
     expect(pending.status).toBe("PENDING");
-    expect(pending.photos).toEqual([{ key, status: "PENDING" }]);
+    expect(pending.photos).toEqual([
+      { key, status: "PENDING", blurredKey: null },
+    ]);
     await kit.auth.background.settled();
     const settled = await me.listings.find(pending._id.toHexString());
     expect(settled?.status).toBe("OPEN");
-    expect(settled?.photos).toEqual([{ key, status: "READY" }]);
+    expect(settled?.photos).toEqual([
+      { key, status: "READY", blurredKey: null },
+    ]);
   });
 
   test("a photo missing from the bucket is dropped, and the listing opens without it", async () => {
@@ -88,7 +92,7 @@ describe("declare", () => {
     expect(settled).toMatchObject({ status: "OPEN", photos: [] });
   });
 
-  test("a document's listing opens at once, its photo held back: pending, never served", async () => {
+  test("a document's listing is pending until its photo is blurred, then opens", async () => {
     const me = await listingsAs(kit);
     const key = await photoOf(kit, me.token);
     const document = lostContent({
@@ -96,22 +100,18 @@ describe("declare", () => {
       documentType: "CNI",
       photoKeys: [key],
     });
-    const open = await me.listings.declare(
+    const declared = await me.listings.declare(
       me.viewer,
       { ...document, kind: "LOST", publish: true },
       null,
     );
+    expect(declared.status).toBe("PENDING");
     await kit.auth.background.settled();
-    const after = await me.listings.find(open._id.toHexString());
+    const after = await me.listings.find(declared._id.toHexString());
     expect(after).toMatchObject({
       status: "OPEN",
-      photos: [{ key, status: "PENDING" }],
+      photos: [{ key, status: "READY", blurredKey: expect.any(String) }],
     });
-    expect(
-      (await me.listings.publicById(open._id.toHexString()))._id.equals(
-        open._id,
-      ),
-    ).toBe(true);
   });
 
   test("a bad content is one invalid-input with each issue on its path", async () => {

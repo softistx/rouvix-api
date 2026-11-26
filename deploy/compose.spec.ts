@@ -9,6 +9,8 @@ type Service = {
   restart?: string;
   profiles?: string[];
   environment?: Record<string, string>;
+  networks?: string[];
+  read_only?: boolean;
 };
 
 const load = async (path: string) => {
@@ -64,6 +66,7 @@ describe("the deploy compose file", () => {
       "AT_API_KEY",
       "S3_ACCESS_KEY",
       "S3_SECRET_KEY",
+      "ID_FIELDS_KEY",
     ]) {
       expect(text).toContain(`\${${name}:?}`);
     }
@@ -74,6 +77,19 @@ describe("the deploy compose file", () => {
       ([name]) => name === "api",
     )?.[1];
     expect(api?.environment?.["SMS_PROVIDER"]).toBe("africastalking");
+  });
+
+  test("the OCR, which reads ID documents, is on the internal network alone, read-only", async () => {
+    const services = Object.fromEntries(await load(files.deploy));
+    expect(services["ocr"]?.networks).toEqual(["internal"]);
+    expect(services["ocr"]?.read_only).toBe(true);
+    expect(services["api"]?.environment?.["OCR_URL"]).toBe(
+      "http://rouvix-ocr:8884",
+    );
+    const parsed = Bun.YAML.parse(await Bun.file(files.deploy).text()) as {
+      networks: Record<string, { internal?: boolean }>;
+    };
+    expect(parsed.networks["internal"]?.internal).toBe(true);
   });
 
   test("the example env file holds no real secret", async () => {

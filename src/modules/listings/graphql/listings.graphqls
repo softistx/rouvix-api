@@ -41,9 +41,9 @@ enum KeptAt {
 }
 
 enum PhotoStatus {
-  "Not processed yet (an ID document's photo stays here until the blur slice)."
+  "Not processed yet: the server's own OCR reads it, and blurs it when it is (or looks like) an ID document's."
   PENDING
-  "Processed: served by `/media/listing-photos/<key>/full`."
+  "Processed: served by `/media/listing-photos/<key>/full` to the author, and to visitors through its blurred copy when it has one."
   READY
 }
 
@@ -60,11 +60,17 @@ input ListingAttributesInput {
   marks: String @constraint(minLength: 1, maxLength: 300)
 }
 
-"A photo of the author's own listing: its media key, never a URL."
+"A photo of the author's own listing: its media keys, never a URL."
 type Photo {
-  "Read the bytes at `/media/listing-photos/<key>/full`."
+  "Read the bytes at `/media/listing-photos/<key>/full`: the author and the organisation's agents only for an ID document's photo."
   key: ID!
   status: PhotoStatus!
+  """
+  The strongly blurred copy visitors see instead, at
+  `/media/listing-blurred/<key>`: set for an ID document's photo and for any
+  photo the server's OCR found ID-like; null for a photo shown as it is.
+  """
+  blurredKey: ID
 }
 
 "The place of the author's own listing, as they gave it."
@@ -122,6 +128,10 @@ type Listing {
   expiresAt: DateTime
   "How many times it was extended, three at most."
   extendedCount: Int!
+  "An ID document's number as visitors see it, all but its first two characters masked (`99••••••••`); null when none was read."
+  maskedNumber: String
+  "An ID document's holder as visitors see them, first name and last-name initial (`Jean E.`); null when none was read."
+  holderHint: String
   "The slug of the organisation whose register holds it, if any."
   organisationSlug: String
   "Passed back to `updateListing` to lock the write."
@@ -133,8 +143,9 @@ type Listing {
 """
 A listing as a visitor sees it, masked: no author, no exact private point, no
 question or answer, no phone number, no original photo. For an ID document
-(`documentType` set) there is no free text and no photo until the blur slice:
-`title`, `description` and `attributes` are null and `photoKeys` empty.
+(`documentType` set) there is no free text (`title`, `description` and
+`attributes` are null, `photoKeys` empty): its type, its country, the masked
+number, the holder hint and its photos blurred whole (`blurredPhotoKeys`).
 """
 type PublicListing {
   id: ID!
@@ -145,8 +156,14 @@ type PublicListing {
   title: String
   description: String
   attributes: ListingAttributes
-  "The processed photos, as media keys, at `/media/listing-photos/<key>/full`."
+  "The processed photos shown as they are, at `/media/listing-photos/<key>/full`: never an ID document's nor an ID-like one."
   photoKeys: [ID!]! @listSize(assumedSize: 5)
+  "The photos shown blurred whole (an ID document's, or any the server's OCR found ID-like), at `/media/listing-blurred/<key>`."
+  blurredPhotoKeys: [ID!]! @listSize(assumedSize: 5)
+  "An ID document's number, all but its first two characters masked (`99••••••••`); null when none was read or for an object."
+  maskedNumber: String
+  "An ID document's holder, first name and last-name initial (`Jean E.`); null when none was read or for an object."
+  holderHint: String
   place: PublicPlace!
   date: Date!
   status: ListingStatus!
@@ -273,7 +290,8 @@ extend type Mutation {
   """
   extendListing(id: ID!): Listing!
   """
-  Closes a listing for a reason. An ID document's photos are removed with it.
+  Closes a listing for a reason. An ID document's photos, their blurred copies
+  and what the OCR read of it are removed with it.
   Needs the author or an agent; `listings.errors.invalid-status` (409).
   """
   closeListing(id: ID!, reason: CloseReason!): Listing!

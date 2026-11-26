@@ -1,5 +1,5 @@
 /** The images this app builds, as named in the compose file. */
-export const APP_IMAGES = ["rouvix-api"];
+export const APP_IMAGES = ["rouvix-api", "rouvix-ocr"];
 
 /**
  * The image references to remove after a deploy: the references of this app's

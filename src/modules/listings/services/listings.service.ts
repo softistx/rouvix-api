@@ -29,7 +29,12 @@ import {
   storedFields,
 } from "../listings.utils";
 import type { CloseReason, ListingKind, listings } from "../models";
-import { contentIssues } from "../rules";
+import {
+  closingPhotos,
+  contentIssues,
+  NO_ID_FIELDS,
+  processesAgain,
+} from "../rules";
 import type { PhotosService } from "./photos.service";
 
 export type ListingDocument = ReadDocumentOf<typeof listings>;
@@ -67,6 +72,19 @@ export class ListingsService {
   async findLive(id: string) {
     const listing = await this.find(id);
     return listing?.status === "REMOVED" ? undefined : listing;
+  }
+
+  // Whether a media key is the photo of an ID document, or one the OCR found
+  // ID-like: what the remote photo guard refuses to send (src/modules/ai).
+  async isIdPhoto(key: string): Promise<boolean> {
+    const listing = await this.mongo.db.listings.findFirst({
+      "photos.key": key,
+    });
+    if (listing === undefined) return false;
+    return (
+      listing.documentType !== null ||
+      listing.photos.some((p) => p.key === key && p.blurredKey !== null)
+    );
   }
 
   // A listing a visitor may read: open or claimed.
@@ -125,6 +143,9 @@ export class ListingsService {
 
   // Replaces the listing's content (stated whole), under `version`; `publish`
   // takes a draft public. Only a draft, a pending or an open listing changes.
+  // An ID document's photos are processed again from the start when its
+  // document type changes or one of them goes (its fields were read from them
+  // all): their blurred copies and fields are dropped, the job reads them anew.
   update(
     viewer: Viewer,
     id: string,
@@ -135,16 +156,18 @@ export class ListingsService {
     return locked(true, async () => {
       const listing = await this.reread(id);
       this.assertStatus(listing, EDITABLE_STATUSES);
+      const removed = listing.photos.filter(
+        (photo) => !content.photoKeys.includes(photo.key),
+      );
+      const again = processesAgain(listing, content, removed.length > 0);
       const fields = await this.fieldsOf(
         viewer,
         content,
         listing.kind,
         listing,
         listing.orgId,
+        again,
       );
-      const removed = listing.photos
-        .map((photo) => photo.key)
-        .filter((key) => !content.photoKeys.includes(key));
       const publishing =
         publish === true && listing.status === "DRAFT"
           ? this.publishing(fields)
@@ -152,9 +175,11 @@ export class ListingsService {
       const written = await this.mongo.as(viewer.id).db.listings.update(id, {
         ...fields,
         ...publishing,
+        ...(again && NO_ID_FIELDS),
         version,
       });
       await this.deps.photos.discard(removed);
+      if (again) await this.deps.photos.discardBlurred(listing.photos);
       this.settleLater(written);
       return written;
     });
@@ -176,29 +201,29 @@ export class ListingsService {
     });
   }
 
-  // Closes the listing for a reason. A document's photos are removed with it
-  // (spec §4.2): the ID image does not outlive the listing.
+  // Closes the listing for a reason. An ID document's photos go with it, and
+  // its fields (spec §4.2, §7): the ID image does not outlive the listing. An
+  // object's photos stay, but those the OCR found ID-like.
   close(viewer: Viewer, id: string, reason: CloseReason) {
     return locked(false, async () => {
       const listing = await this.reread(id);
       this.assertStatus(listing, CLOSABLE_STATUSES);
+      const { kept, gone } = closingPhotos(listing);
       const closed = await this.mongo.as(viewer.id).db.listings.update(id, {
         status: "CLOSED",
         closedReason: reason,
         closedAt: this.deps.now(),
-        ...(listing.documentType !== null && { photos: [] }),
+        photos: kept,
+        ...NO_ID_FIELDS,
         version: listing.version,
       });
-      if (listing.documentType !== null) {
-        await this.deps.photos.discard(
-          listing.photos.map((photo) => photo.key),
-        );
-      }
+      await this.deps.photos.discard(gone);
       return closed;
     });
   }
 
-  // Takes the listing down for good: out of every read, its photos removed.
+  // Takes the listing down for good: out of every read, its photos and any
+  // ID field removed.
   remove(viewer: Viewer, id: string) {
     return locked(false, async () => {
       const listing = await this.reread(id);
@@ -206,9 +231,10 @@ export class ListingsService {
       await this.mongo.as(viewer.id).db.listings.update(id, {
         status: "REMOVED",
         photos: [],
+        ...NO_ID_FIELDS,
         version: listing.version,
       });
-      await this.deps.photos.discard(listing.photos.map((photo) => photo.key));
+      await this.deps.photos.discard(listing.photos);
       return id;
     });
   }
@@ -226,16 +252,11 @@ export class ListingsService {
     if (!allowed.includes(listing.status)) throw invalidStatus(listing.status);
   }
 
-  // What publishing sets: a listing with photos to settle is pending until
-  // they are (the job opens it); one without, or an ID document's (whose photos
-  // are held back for the blur slice and never served), opens at once. 90 days
-  // from now.
-  private publishing(fields: {
-    photos: unknown[];
-    documentType: string | null;
-  }) {
+  // What publishing sets: a listing with photos is pending until the job has
+  // processed them (it opens it); one without opens at once. 90 days from now.
+  private publishing(fields: { photos: unknown[] }) {
     const now = this.deps.now();
-    const waiting = fields.photos.length > 0 && fields.documentType === null;
+    const waiting = fields.photos.length > 0;
     return {
       status: waiting ? ("PENDING" as const) : ("OPEN" as const),
       publishedAt: now,
@@ -249,7 +270,6 @@ export class ListingsService {
     const waiting = listing.status === "PENDING";
     const photos =
       listing.status !== "DRAFT" &&
-      listing.documentType === null &&
       listing.photos.some((photo) => photo.status === "PENDING");
     if (!waiting && !photos) return;
     const id = listing._id.toHexString();
@@ -260,13 +280,15 @@ export class ListingsService {
 
   // The stored fields of a content, once checked: one `invalid-input` with
   // every issue when it is not. `current` is the listing being replaced, whose
-  // own photos stay attachable; `orgId` its organisation's register, if any.
+  // own photos stay attachable (and keep how they were processed, unless
+  // `again`); `orgId` its organisation's register, if any.
   private async fieldsOf(
     viewer: Viewer,
     content: ListingContent,
     kind: ListingKind,
     current: ListingDocument | null,
     orgId: ObjectId | null,
+    again = false,
   ) {
     const country = await this.deps.countries.active(content.countryCode);
     if (!country) throw countryNotFound(content.countryCode);
@@ -293,10 +315,8 @@ export class ListingsService {
       },
     );
     if (issues.length > 0) throw invalidInput(issues);
-    return storedFields(
-      content,
-      new Map(current?.photos.map((p) => [p.key, p.status])),
-    );
+    const known = again ? [] : (current?.photos ?? []);
+    return storedFields(content, new Map(known.map((p) => [p.key, p])));
   }
 
   // The keys the viewer uploaded that no other listing carries.

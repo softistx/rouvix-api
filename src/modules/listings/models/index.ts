@@ -5,10 +5,13 @@ export {
   type KeptAt,
   keptAt,
   type ListingKind,
+  type ListingPhoto,
   type ListingStatus,
   listingKind,
+  listingPhoto,
   listingStatus,
   listings,
   type PhotoStatus,
   photoStatus,
+  publicIdText,
 } from "./listings.model";

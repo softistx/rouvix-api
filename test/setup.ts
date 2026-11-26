@@ -11,6 +11,10 @@ Bun.env["MONGO_URI"] = replSet.getUri("rouvix-test");
 // Specs never reach a Redis of the developer's .env, nor a real SMS provider:
 // they inject their own ports.
 delete Bun.env["REDIS_URL"];
+// Nor the developer's OCR sidecar: the ID document specs inject a fake OCR, and
+// the vault is a key of the run.
+delete Bun.env["OCR_URL"];
+delete Bun.env["ID_FIELDS_KEY"];
 Bun.env["SMS_PROVIDER"] = "log";
 
 // Every collection and its indexes, before any spec, then the migrations and

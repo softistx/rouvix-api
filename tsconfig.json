@@ -25,5 +25,5 @@
       "~/*": ["./test/*"]
     }
   },
-  "include": ["src", "test", "deploy", "codegen.ts"]
+  "include": ["src", "test", "deploy", "docker", "codegen.ts"]
 }

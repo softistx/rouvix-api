@@ -3,11 +3,13 @@ import type { Resolvers } from "@/generated/graphql/resolvers";
 import { fromGeoJson } from "@/modules/config";
 import { listingIdOf } from "../listings.errors";
 import { dateString, publicPoint } from "../listings.utils";
+import { publicPhotoKeys } from "../rules";
 import { declarer, editorOf } from "./support";
 
 // The author's own view maps the document; the visitor's masks it here, field
 // by field: nothing of the author, the exact point of a private place, the
-// questions, or an ID document's text and photos is returned to a visitor.
+// questions, an ID document's text or an ID photo's own key is returned to a
+// visitor. No resolver returns `idFields` or `idNumberHash`, to anyone.
 export const listingResolvers: Resolvers = {
   Query: {
     listing: (_, { id }, ctx) =>
@@ -46,6 +48,8 @@ export const listingResolvers: Resolvers = {
   Listing: {
     id: (listing) => listing._id.toHexString(),
     date: (listing) => dateString(listing.date),
+    maskedNumber: (listing) => listing.public.maskedNumber,
+    holderHint: (listing) => listing.public.holderHint,
     place: (listing) => ({
       ...listing.place,
       point: fromGeoJson(listing.place.point),
@@ -63,12 +67,10 @@ export const listingResolvers: Resolvers = {
       listing.documentType === null ? listing.description : null,
     attributes: (listing) =>
       listing.documentType === null ? listing.attributes : null,
-    photoKeys: (listing) =>
-      listing.documentType === null
-        ? listing.photos
-            .filter((photo) => photo.status === "READY")
-            .map((photo) => photo.key)
-        : [],
+    photoKeys: (listing) => publicPhotoKeys(listing).photoKeys,
+    blurredPhotoKeys: (listing) => publicPhotoKeys(listing).blurredPhotoKeys,
+    maskedNumber: (listing) => listing.public.maskedNumber,
+    holderHint: (listing) => listing.public.holderHint,
     place: ({ place, documentType }) => ({
       // The author's words are withheld for an item kept at home and for an
       // ID document.
