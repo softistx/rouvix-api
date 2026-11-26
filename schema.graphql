@@ -135,6 +135,23 @@ An integer of any size, as a decimal string (a safe-integer number is accepted a
 """
 scalar BigInt
 
+type BoundingBox {
+  east: Longitude!
+  north: Latitude!
+  south: Latitude!
+  west: Longitude!
+}
+
+"""
+A box of the map; `west` is not east of `east`, `south` not north of `north`.
+"""
+input BoundingBoxInput {
+  east: Longitude!
+  north: Latitude!
+  south: Latitude!
+  west: Longitude!
+}
+
 """An IPv4 block in CIDR notation, such as 10.0.0.0/8."""
 scalar CIDRv4 @specifiedBy(url: "https://www.rfc-editor.org/rfc/rfc4632")
 
@@ -474,6 +491,11 @@ input ListingAttributesInput {
   marks: String @constraint(minLength: 1, maxLength: 300)
 }
 
+type ListingCategoryCount {
+  categoryKey: String!
+  count: Int!
+}
+
 type ListingConnection {
   edges: [ListingEdge!]! @listSize(assumedSize: 100)
   pageInfo: PageInfo!
@@ -507,8 +529,45 @@ input ListingContentInput {
   title: String! @constraint(minLength: 3, maxLength: 120)
 }
 
+"""
+What the filter chips show: each count is taken over the filter without that
+chip's own field (kinds without `kind`, categories without `categoryKey`), so a
+chip says what choosing it would give.
+"""
+type ListingCounts {
+  categories: [ListingCategoryCount!]! @listSize(assumedSize: 40)
+  kinds: [ListingKindCount!]! @listSize(assumedSize: 2)
+}
+
 type ListingEdge {
   node: Listing!
+}
+
+"""
+What `searchListings` and `mapListings` narrow the open listings by (spec
+§5.4). Only `OPEN` listings are ever searched, and only what the masked view
+shows is matched: an ID document is found by its type, never by its text.
+"""
+input ListingFilter {
+  """A root category."""
+  categoryKey: String @constraint(pattern: "^[A-Z][A-Z0-9_]*$")
+  """The town the author gave, case and accents ignored."""
+  city: String @constraint(minLength: 1, maxLength: 80)
+  """From this day on (the day lost or found), included."""
+  dateFrom: Date
+  """Up to this day, included; not before `dateFrom`."""
+  dateTo: Date
+  """A document type (`CNI`)."""
+  documentType: String @constraint(pattern: "^[A-Z][A-Z0-9_]*$")
+  kind: ListingKind
+  """Within a distance of a point ("around me")."""
+  near: ListingNearInput
+  """
+  Words of the title, description, brand, marks and colours, French and
+  English alike: case and accents are ignored and there is no stemming
+  ("sacs" does not find "sac"). `"a phrase"` and `-word` work.
+  """
+  text: String @constraint(minLength: 1, maxLength: 200)
 }
 
 """Whether a declaration is of an item lost or found."""
@@ -519,8 +578,45 @@ enum ListingKind {
   LOST
 }
 
+type ListingKindCount {
+  count: Int!
+  kind: ListingKind!
+}
+
+"""
+What a box of the map shows: found listings as markers or clusters (500 at
+most together), lost listings as circles (500 at most, newest first).
+"""
+type ListingMap {
+  circles: [MapCircle!]! @listSize(assumedSize: 500)
+  clusters: [MapCluster!]! @listSize(assumedSize: 500)
+  markers: [MapMarker!]! @listSize(assumedSize: 500)
+  """More listings matched than were read: zoom in or narrow the filter."""
+  truncated: Boolean!
+}
+
+"""
+A point and a distance. The listings' own points are blurred, so a distance is good to about 250 m.
+"""
+input ListingNearInput {
+  point: GeoPointInput!
+  """100 m to 100 km."""
+  radiusM: Int! @constraint(min: 100, max: 100000)
+}
+
+enum ListingOrder {
+  """Newest day first."""
+  DATE
+  """Nearest first; needs `near`, else newest day first."""
+  DISTANCE
+  """Best text match first; newest day first when there is no text."""
+  RELEVANCE
+}
+
 """The place of the author's own listing, as they gave it."""
 type ListingPlace {
+  """The town, as the author gave it; null when none."""
+  city: String
   """A found item's whereabouts; null for a lost one."""
   keptAt: KeptAt
   """Where it was lost or found, in words."""
@@ -531,6 +627,11 @@ type ListingPlace {
 }
 
 input ListingPlaceInput {
+  """
+  The town, for the search's city filter ("Douala"). Public: a name, with no
+  digit, comma or other mark of an address.
+  """
+  city: String @constraint(minLength: 1, maxLength: 80, pattern: "^[^0-9,;:/@#]+$")
   """Required for a found item. Refused for a lost one."""
   keptAt: KeptAt
   label: String! @constraint(minLength: 1, maxLength: 160)
@@ -604,6 +705,36 @@ scalar Longitude
 A MAC address: six hex pairs separated by colons (not the IEEE hyphen form).
 """
 scalar MAC
+
+"""
+A lost listing's loss area: its centre is blurred, never the exact point.
+"""
+type MapCircle {
+  categoryKey: String!
+  center: GeoPoint!
+  documentType: String
+  """Read it with `listing(id:)`."""
+  id: ID!
+  radiusM: Int!
+}
+
+"""Several found listings close together at this zoom."""
+type MapCluster {
+  """Where its members lie: zoom to it."""
+  bounds: BoundingBox!
+  count: Int!
+  """The centre of its members."""
+  point: GeoPoint!
+}
+
+"""A found listing on the map, at its blurred point."""
+type MapMarker {
+  categoryKey: String!
+  documentType: String
+  """Read it with `listing(id:)`."""
+  id: ID!
+  point: GeoPoint!
+}
 
 """
 A member of an organisation, or a person invited to it. The phone number is
@@ -886,9 +1017,31 @@ type PublicListing {
 }
 
 """
+A page of the search. A query reaches its first 500 results at most
+(`hasNextPage` is false past them) whatever `totalCount` says.
+"""
+type PublicListingConnection {
+  counts: ListingCounts!
+  edges: [PublicListingEdge!]! @listSize(assumedSize: 50)
+  pageInfo: PageInfo!
+  """Every open listing the filter matches."""
+  totalCount: Int!
+}
+
+type PublicListingEdge {
+  """Metres from `near`, null without one."""
+  distanceM: Int
+  node: PublicListing!
+}
+
+"""
 The place as a visitor sees it: a point blurred to about 110 m unless the item is kept in a public place.
 """
 type PublicPlace {
+  """
+  The town the author gave, the filter `ListingFilter.city` matches; null when none.
+  """
+  city: String
   keptAt: KeptAt
   """
   Where, in the author's words; null for an item kept with its finder, whose words could name their home, and for an ID document.
@@ -935,6 +1088,14 @@ type Query {
   """
   listing(id: ID!): PublicListing!
   """
+  The open listings of a box, ready to draw: found ones as markers, clustered
+  on the server for the zoom (`zoom` 0 to 22, worked out from the box when
+  absent), lost ones as circles. Public; counted against the caller's address.
+  An empty box (south above north, west east of east) is
+  `validation.errors.invalid-input`.
+  """
+  mapListings(bbox: BoundingBoxInput!, filter: ListingFilter, zoom: Int @constraint(min: 0, max: 22)): ListingMap!
+  """
   A listing as its author or its organisation's agents see it. Needs a
   signed-in, unsuspended account; anybody else, and an unknown id, is
   `listings.errors.listing-not-found` (404).
@@ -967,6 +1128,13 @@ type Query {
   safePlaces(after: String, city: String @constraint(minLength: 1, maxLength: 120), countryCode: String @constraint(pattern: "^[A-Z]{2}$"), first: Int = 20 @constraint(min: 1, max: 100)): SafePlaceConnection!
   """The safe places within a radius of a point, nearest first. Public."""
   safePlacesNear(countryCode: String @constraint(pattern: "^[A-Z]{2}$"), first: Int = 10 @constraint(min: 1, max: 50), point: GeoPointInput!, radiusM: Int = 5000 @constraint(min: 100, max: 100000)): [SafePlaceNear!]! @listSize(assumedSize: 50)
+  """
+  The open listings a filter matches, in the masked view. Public; counted
+  against the caller's address (`throttle.errors.too-many`, 429). Refusals: one
+  `validation.errors.invalid-input` for a `dateTo` before `dateFrom` and for a
+  cursor (`after`) that is not one this query gave.
+  """
+  searchListings(after: String, filter: ListingFilter, first: Int = 20 @constraint(min: 1, max: 50), orderBy: ListingOrder = DATE): PublicListingConnection!
   """
   The signed-in account and its roles and organisations; null for an anonymous
   request. A suspended account is still answered, with `suspendedAt` set, so

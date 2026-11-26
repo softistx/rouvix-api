@@ -1,0 +1,3 @@
+{
+  "throttle.errors.too-many": "Trop de requêtes : réessayez dans {minutes, plural, one {# minute} other {# minutes}}."
+}

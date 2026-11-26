@@ -85,7 +85,10 @@ describe("what a visitor reaches from a listing", () => {
       "myListings",
       "updateListing",
     ]);
-    expect(returning("PublicListing")).toEqual(["listing"]);
+    expect(returning("PublicListing").sort()).toEqual([
+      "listing",
+      "searchListings",
+    ]);
   });
 
   test("no listing type holds an account id, a phone, a tenant or a storage field", () => {

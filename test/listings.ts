@@ -2,6 +2,7 @@ import { viewerOf } from "@/auth/access";
 import { mongo } from "@/config/db";
 import { services } from "@/modules";
 import type { ListingContent } from "@/modules/listings/services";
+import { textRanker } from "@/modules/search";
 import type { AuthApp } from "~/auth";
 import { fakeE164, signedIn, uploadPhoto } from "~/fixtures";
 import { jpegOf } from "~/images";
@@ -19,6 +20,7 @@ export async function listingsAs(kit: AuthApp, n = 1) {
     mailer: kit.mailer,
     geocoder: kit.geocoder,
     media: kit.storage.bucket,
+    ranker: textRanker,
     background: kit.auth.background,
     viewer,
   });

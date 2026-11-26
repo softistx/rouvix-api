@@ -5,6 +5,7 @@ import { createApp } from "@/app";
 import { createAuth } from "@/auth/auth";
 import { mongo } from "@/config/db";
 import { clientHeader } from "@/http/csrf";
+import type { Throttle } from "@/throttle";
 import { memoryBucket } from "~/bucket";
 import { fakeGeocoder } from "~/geocoder";
 import { memorySmsSender } from "~/sms";
@@ -13,7 +14,7 @@ import { memorySmsSender } from "~/sms";
 // mailer and SMS sender whose outboxes a spec reads, a fixed clock it moves
 // (sessions expire by it) and a cheap hasher. Each call builds its own, so a
 // spec moving its clock moves no other's.
-export function authApp() {
+export function authApp(options: { throttle?: Throttle } = {}) {
   const clock = fixedClock(Date.now());
   const mailer = createMemoryMailer();
   const sms = memorySmsSender();
@@ -30,6 +31,7 @@ export function authApp() {
     mailer,
     geocoder,
     media: storage.bucket,
+    ...(options.throttle && { throttle: options.throttle }),
     now: () => new Date(clock.now()),
   });
   // A client sending the session `token` as a bearer, and `language` as

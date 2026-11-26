@@ -2,6 +2,7 @@ import { codes as accounts } from "@/modules/accounts/accounts.errors";
 import { codes as config } from "@/modules/config/config.errors";
 import { codes as listings } from "@/modules/listings/listings.errors";
 import { codes as organisations } from "@/modules/organisations/organisations.errors";
+import { codes as throttle } from "@/throttle/throttle.errors";
 import { defineCodes } from "./define-codes";
 
 // Who is asking: shared by every module, so declared here.
@@ -35,6 +36,7 @@ export const errorCodes = [
   ...config,
   ...listings,
   ...organisations,
+  ...throttle,
 ] as const;
 
 export type ErrorCode = (typeof errorCodes)[number];

@@ -76,6 +76,8 @@ type ListingPlace {
   radiusM: Int
   "A found item's whereabouts; null for a lost one."
   keptAt: KeptAt
+  "The town, as the author gave it; null when none."
+  city: String
 }
 
 "The place as a visitor sees it: a point blurred to about 110 m unless the item is kept in a public place."
@@ -85,6 +87,8 @@ type PublicPlace {
   point: GeoPoint!
   radiusM: Int
   keptAt: KeptAt
+  "The town the author gave, the filter `ListingFilter.city` matches; null when none."
+  city: String
 }
 
 "A question a claimant answers, with the answer the finder expects. The author's view only."
@@ -168,6 +172,12 @@ input ListingPlaceInput {
   radiusM: Int @constraint(min: 200, max: 20000)
   "Required for a found item. Refused for a lost one."
   keptAt: KeptAt
+  """
+  The town, for the search's city filter ("Douala"). Public: a name, with no
+  digit, comma or other mark of an address.
+  """
+  city: String
+    @constraint(minLength: 1, maxLength: 80, pattern: "^[^0-9,;:/@#]+$")
 }
 
 input ListingQuestionInput {

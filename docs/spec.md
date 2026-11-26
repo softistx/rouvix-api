@@ -182,7 +182,19 @@ Each module: model, collections, SDL, service with spec, resolver, error codes, 
 - `mapListings(bbox, filter)`: points clustered on the server per zoom (at most 500
   markers), loss areas as circles. Never an exact point for a `LOST` listing (the circle
   only) nor the home of a private finder (rounded to ~200 m).
-- Visitor reads are throttled per address.
+- Visitor reads are throttled per address (`throttle.errors.too-many`, 429).
+- Shapes (slice 4): `searchListings(filter, first, after, orderBy)` returns a
+  `PublicListingConnection` of `PublicListingEdge { node: PublicListing, distanceM }`
+  with `totalCount` and `counts { kinds, categories }`; `orderBy` is `RELEVANCE`, `DATE`
+  or `DISTANCE`. A query reaches its first 500 results (`first` at most 50). Only the
+  masked view is matched: an ID document is found by its type, never by its text, and a
+  place label is never searched. `near` and the map read a stored point blurred to a
+  0.002 degree cell (about 220 m) of the point the public view shows, never the exact one.
+  `mapListings(bbox, filter, zoom)` returns `ListingMap { markers, clusters, circles,
+  truncated }`: found items as markers or server-side clusters (500 entries at most
+  together), lost items as circles (500 at most). Text has no stemming (French and
+  English alike, case and accents ignored). The ranking sits behind a `ListingRanker`
+  port: today the text index's score, slice 6 may re-rank by embeddings.
 
 ### 5.5 `ai`
 

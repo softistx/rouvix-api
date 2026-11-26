@@ -1,0 +1,162 @@
+"""
+What `searchListings` and `mapListings` narrow the open listings by (spec
+§5.4). Only `OPEN` listings are ever searched, and only what the masked view
+shows is matched: an ID document is found by its type, never by its text.
+"""
+input ListingFilter {
+  """
+  Words of the title, description, brand, marks and colours, French and
+  English alike: case and accents are ignored and there is no stemming
+  ("sacs" does not find "sac"). `"a phrase"` and `-word` work.
+  """
+  text: String @constraint(minLength: 1, maxLength: 200)
+  kind: ListingKind
+  "A root category."
+  categoryKey: String @constraint(pattern: "^[A-Z][A-Z0-9_]*$")
+  "A document type (`CNI`)."
+  documentType: String @constraint(pattern: "^[A-Z][A-Z0-9_]*$")
+  "The town the author gave, case and accents ignored."
+  city: String @constraint(minLength: 1, maxLength: 80)
+  "From this day on (the day lost or found), included."
+  dateFrom: Date
+  "Up to this day, included; not before `dateFrom`."
+  dateTo: Date
+  "Within a distance of a point (\"around me\")."
+  near: ListingNearInput
+}
+
+"A point and a distance. The listings' own points are blurred, so a distance is good to about 250 m."
+input ListingNearInput {
+  point: GeoPointInput!
+  "100 m to 100 km."
+  radiusM: Int! @constraint(min: 100, max: 100000)
+}
+
+enum ListingOrder {
+  "Best text match first; newest day first when there is no text."
+  RELEVANCE
+  "Newest day first."
+  DATE
+  "Nearest first; needs `near`, else newest day first."
+  DISTANCE
+}
+
+type PublicListingEdge {
+  node: PublicListing!
+  "Metres from `near`, null without one."
+  distanceM: Int
+}
+
+type ListingKindCount {
+  kind: ListingKind!
+  count: Int!
+}
+
+type ListingCategoryCount {
+  categoryKey: String!
+  count: Int!
+}
+
+"""
+What the filter chips show: each count is taken over the filter without that
+chip's own field (kinds without `kind`, categories without `categoryKey`), so a
+chip says what choosing it would give.
+"""
+type ListingCounts {
+  kinds: [ListingKindCount!]! @listSize(assumedSize: 2)
+  categories: [ListingCategoryCount!]! @listSize(assumedSize: 40)
+}
+
+"""
+A page of the search. A query reaches its first 500 results at most
+(`hasNextPage` is false past them) whatever `totalCount` says.
+"""
+type PublicListingConnection {
+  edges: [PublicListingEdge!]! @listSize(assumedSize: 50)
+  pageInfo: PageInfo!
+  "Every open listing the filter matches."
+  totalCount: Int!
+  counts: ListingCounts!
+}
+
+"A box of the map; `west` is not east of `east`, `south` not north of `north`."
+input BoundingBoxInput {
+  south: Latitude!
+  west: Longitude!
+  north: Latitude!
+  east: Longitude!
+}
+
+type BoundingBox {
+  south: Latitude!
+  west: Longitude!
+  north: Latitude!
+  east: Longitude!
+}
+
+"A found listing on the map, at its blurred point."
+type MapMarker {
+  "Read it with `listing(id:)`."
+  id: ID!
+  categoryKey: String!
+  documentType: String
+  point: GeoPoint!
+}
+
+"Several found listings close together at this zoom."
+type MapCluster {
+  "The centre of its members."
+  point: GeoPoint!
+  count: Int!
+  "Where its members lie: zoom to it."
+  bounds: BoundingBox!
+}
+
+"A lost listing's loss area: its centre is blurred, never the exact point."
+type MapCircle {
+  "Read it with `listing(id:)`."
+  id: ID!
+  categoryKey: String!
+  documentType: String
+  center: GeoPoint!
+  radiusM: Int!
+}
+
+"""
+What a box of the map shows: found listings as markers or clusters (500 at
+most together), lost listings as circles (500 at most, newest first).
+"""
+type ListingMap {
+  markers: [MapMarker!]! @listSize(assumedSize: 500)
+  clusters: [MapCluster!]! @listSize(assumedSize: 500)
+  circles: [MapCircle!]! @listSize(assumedSize: 500)
+  "More listings matched than were read: zoom in or narrow the filter."
+  truncated: Boolean!
+}
+
+extend type Query {
+  """
+  The open listings a filter matches, in the masked view. Public; counted
+  against the caller's address (`throttle.errors.too-many`, 429). Refusals: one
+  `validation.errors.invalid-input` for a `dateTo` before `dateFrom` and for a
+  cursor (`after`) that is not one this query gave.
+  """
+  searchListings(
+    filter: ListingFilter
+    first: Int = 20 @constraint(min: 1, max: 50)
+    after: String
+    orderBy: ListingOrder = DATE
+  ): PublicListingConnection!
+  """
+  The open listings of a box, ready to draw: found ones as markers, clustered
+  on the server for the zoom (`zoom` 0 to 22, worked out from the box when
+  absent), lost ones as circles. Public; counted against the caller's address.
+  An empty box (south above north, west east of east) is
+  `validation.errors.invalid-input`.
+  """
+  mapListings(
+    bbox: BoundingBoxInput!
+    filter: ListingFilter
+    zoom: Int @constraint(min: 0, max: 22)
+  ): ListingMap!
+}
