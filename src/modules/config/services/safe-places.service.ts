@@ -3,7 +3,12 @@ import type { ObjectId } from "mongodb";
 import type { AppMongo } from "@/config/db";
 import { toConnection } from "@/shared/pagination";
 import { countryNotFound, locked, safePlaceNotFound } from "../config.errors";
-import { distanceM, type GeoPoint, toGeoJson } from "../config.utils";
+import {
+  distanceM,
+  fromGeoJson,
+  type GeoPoint,
+  toGeoJson,
+} from "../config.utils";
 import type { SafePlaceKind, safePlaces } from "../models";
 import type { CountriesService } from "./countries.service";
 
@@ -76,10 +81,7 @@ export class SafePlacesService {
     });
     return found.map((place) => ({
       place,
-      distanceM: distanceM(point, {
-        latitude: place.location.coordinates[1],
-        longitude: place.location.coordinates[0],
-      }),
+      distanceM: distanceM(point, fromGeoJson(place.location)),
     }));
   }
 

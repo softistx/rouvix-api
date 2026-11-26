@@ -14,9 +14,13 @@ export interface NominatimOptions {
   cache: GeocodeCache;
   // The usage policy allows one request a second.
   minIntervalMs?: number;
+  // How many asks may wait for their turn; past it, an ask fails at once (a
+  // retryable error) rather than queue behind a backlog. Default 20.
+  maxQueued?: number;
   timeoutMs?: number;
   // Injected in specs; Bun's `fetch`, the system clock and `setTimeout` otherwise.
   fetch?: typeof fetch;
+  // A monotonic clock in milliseconds (`performance.now` by default).
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -54,60 +58,87 @@ export function resultOf(place: NominatimPlace): GeocodeResult | null {
   };
 }
 
-// The Nominatim adapter (OpenStreetMap's public service, under its usage
-// policy): one request a second, whatever the callers (requests are queued, in
-// this process: the API runs as one instance), the application's own
-// User-Agent, and every answer cached, so a repeated ask never reaches the
-// provider. `fetch`, the clock and the sleep are injected so a spec never
-// waits and never calls out.
-export function nominatimGeocoder(options: NominatimOptions): Geocoder {
-  const send = options.fetch ?? fetch;
-  const now = options.now ?? Date.now;
-  const sleep =
-    options.sleep ??
-    ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  const gap = options.minIntervalMs ?? 1_000;
+type Sleep = (ms: number) => Promise<void>;
+
+// Runs calls one at a time, each at least `gap` after the last one started,
+// and refuses a call when `maxQueued` are already waiting. The clock is
+// monotonic and a wait is never longer than `gap`, so a clock that jumps
+// cannot stall the queue.
+function pacer(options: {
+  gap: number;
+  maxQueued: number;
+  now: () => number;
+  sleep: Sleep;
+}) {
   let queue: Promise<unknown> = Promise.resolve();
   let lastAt = Number.NEGATIVE_INFINITY;
-
-  // Runs `call` after every earlier one, at least `gap` after the last start.
-  function paced<T>(call: () => Promise<T>): Promise<T> {
+  let waiting = 0;
+  return function paced<T>(call: () => Promise<T>): Promise<T> {
+    if (waiting >= options.maxQueued) {
+      return Promise.reject(
+        new GeocoderError("the geocoding queue is full", true),
+      );
+    }
+    waiting += 1;
     const run = queue.then(async () => {
-      const wait = lastAt + gap - now();
-      if (wait > 0) await sleep(wait);
-      lastAt = now();
+      waiting -= 1;
+      const wait = Math.min(options.gap, lastAt + options.gap - options.now());
+      if (wait > 0) await options.sleep(wait);
+      lastAt = options.now();
       return call();
     });
     queue = run.catch(() => undefined);
     return run;
-  }
+  };
+}
 
-  async function get(path: string, params: Record<string, string>) {
-    const url = `${options.baseUrl}${path}?${new URLSearchParams(params)}`;
-    let response: Response;
-    try {
-      response = await send(url, {
-        headers: {
-          "user-agent": options.userAgent,
-          accept: "application/json",
-        },
-        signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
-      });
-    } catch (cause) {
-      throw new GeocoderError("Nominatim did not answer", true, { cause });
-    }
-    if (!response.ok) {
-      throw new GeocoderError(
-        `Nominatim answered ${response.status}`,
-        response.status >= 500 || response.status === 429,
-      );
-    }
-    try {
-      return (await response.json()) as unknown;
-    } catch (cause) {
-      throw new GeocoderError("Nominatim answered no JSON", true, { cause });
-    }
+// One GET to the provider with the application's own User-Agent, its failures
+// as `GeocoderError`s.
+async function getJson(
+  options: NominatimOptions,
+  path: string,
+  params: Record<string, string>,
+) {
+  const send = options.fetch ?? fetch;
+  const url = `${options.baseUrl}${path}?${new URLSearchParams(params)}`;
+  let response: Response;
+  try {
+    response = await send(url, {
+      headers: { "user-agent": options.userAgent, accept: "application/json" },
+      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
+    });
+  } catch (cause) {
+    throw new GeocoderError("Nominatim did not answer", true, { cause });
   }
+  if (!response.ok) {
+    throw new GeocoderError(
+      `Nominatim answered ${response.status}`,
+      response.status >= 500 || response.status === 429,
+    );
+  }
+  try {
+    return (await response.json()) as unknown;
+  } catch (cause) {
+    throw new GeocoderError("Nominatim answered no JSON", true, { cause });
+  }
+}
+
+// The Nominatim adapter (OpenStreetMap's public service, under its usage
+// policy): one request a second, whatever the callers (requests are queued, in
+// this process: the API runs as one instance), the application's own
+// User-Agent, and every answer cached, so a repeated ask never reaches the
+// provider; identical asks in flight share one request. `fetch`, the clock and
+// the sleep are injected so a spec never waits and never calls out.
+export function nominatimGeocoder(options: NominatimOptions): Geocoder {
+  const paced = pacer({
+    gap: options.minIntervalMs ?? 1_000,
+    maxQueued: options.maxQueued ?? 20,
+    now: options.now ?? (() => performance.now()),
+    sleep:
+      options.sleep ??
+      ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))),
+  });
+  const inFlight = new Map<string, Promise<GeocodeResult[]>>();
 
   async function cached(
     key: string,
@@ -115,9 +146,16 @@ export function nominatimGeocoder(options: NominatimOptions): Geocoder {
   ): Promise<GeocodeResult[]> {
     const hit = await options.cache.get(key);
     if (hit !== undefined) return hit.results;
-    const results = await paced(load);
-    await options.cache.set(key, { results });
-    return results;
+    const shared = inFlight.get(key);
+    if (shared !== undefined) return shared;
+    const asked = paced(load)
+      .then(async (results) => {
+        await options.cache.set(key, { results });
+        return results;
+      })
+      .finally(() => inFlight.delete(key));
+    inFlight.set(key, asked);
+    return asked;
   }
 
   return {
@@ -125,7 +163,7 @@ export function nominatimGeocoder(options: NominatimOptions): Geocoder {
       cached(
         `s:${countryCode ?? "-"}:${limit}:${normalized(query)}`,
         async () => {
-          const body = await get("/search", {
+          const body = await getJson(options, "/search", {
             q: query,
             format: "jsonv2",
             addressdetails: "1",
@@ -146,7 +184,7 @@ export function nominatimGeocoder(options: NominatimOptions): Geocoder {
       ),
     reverse: async (point) => {
       const [found] = await cached(`r:${rounded(point)}`, async () => {
-        const body = await get("/reverse", {
+        const body = await getJson(options, "/reverse", {
           lat: String(point.latitude),
           lon: String(point.longitude),
           format: "jsonv2",

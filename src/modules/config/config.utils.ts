@@ -1,6 +1,6 @@
 import type { LocalizedText } from "./models";
 
-// The text in the request's language, else French (the fallback), else English.
+// The text in the request's language: English for `en`, French (the fallback) for any other.
 export const labelIn = (texts: LocalizedText, language: string): string =>
   language === "en" ? texts.en : texts.fr;
 

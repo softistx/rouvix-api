@@ -59,6 +59,20 @@ describe("countryIssues", () => {
   });
 });
 
+describe("categoryIssues of a root", () => {
+  test("a root cannot change kind away from its children", () => {
+    const root = { key: "DOCUMENT", parent: null, isDocument: false };
+    expect(
+      categoryIssues(root, undefined, [{ isDocument: true }])[0]?.path,
+    ).toBe("isDocument");
+    expect(
+      categoryIssues({ ...root, isDocument: true }, undefined, [
+        { isDocument: true },
+      ]),
+    ).toEqual([]);
+  });
+});
+
 describe("categoryIssues", () => {
   const root = { parent: null, isDocument: true };
   const input = { key: "CNI", parent: "DOCUMENT", isDocument: true };
@@ -66,26 +80,26 @@ describe("categoryIssues", () => {
     issues[0]?.params?.["reason"];
 
   test("a root, or a child of a root of the same kind, has none", () => {
-    expect(
-      categoryIssues({ ...input, parent: null }, undefined, false),
-    ).toEqual([]);
-    expect(categoryIssues(input, root, false)).toEqual([]);
+    expect(categoryIssues({ ...input, parent: null }, undefined, [])).toEqual(
+      [],
+    );
+    expect(categoryIssues(input, root, [])).toEqual([]);
   });
 
   test("each way a parent can be wrong has its reason, on `parent`", () => {
     expect(
-      reasonOf(categoryIssues({ ...input, parent: "CNI" }, root, false)),
+      reasonOf(categoryIssues({ ...input, parent: "CNI" }, root, [])),
     ).toBe("self");
-    expect(reasonOf(categoryIssues(input, undefined, false))).toBe("unknown");
+    expect(reasonOf(categoryIssues(input, undefined, []))).toBe("unknown");
     expect(
-      reasonOf(categoryIssues(input, { parent: "X", isDocument: true }, false)),
+      reasonOf(categoryIssues(input, { parent: "X", isDocument: true }, [])),
     ).toBe("notroot");
-    expect(reasonOf(categoryIssues(input, root, true))).toBe("haschildren");
+    expect(reasonOf(categoryIssues(input, root, [{ isDocument: true }]))).toBe(
+      "haschildren",
+    );
     expect(
-      reasonOf(
-        categoryIssues(input, { parent: null, isDocument: false }, false),
-      ),
+      reasonOf(categoryIssues(input, { parent: null, isDocument: false }, [])),
     ).toBe("document");
-    expect(categoryIssues(input, undefined, false)[0]?.path).toBe("parent");
+    expect(categoryIssues(input, undefined, [])[0]?.path).toBe("parent");
   });
 });

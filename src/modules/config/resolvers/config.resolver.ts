@@ -1,16 +1,9 @@
-import { isObjectIdString } from "@softistx/mongo";
-import { ObjectId } from "mongodb";
 import { requirePlatformAdmin, requireUser } from "@/auth/guards";
 import type { Resolvers } from "@/generated/graphql/resolvers";
 import { i18n } from "@/i18n";
-import { safePlaceNotFound } from "../config.errors";
+import { safePlaceIdOf } from "../config.errors";
 import { fromGeoJson, labelIn } from "../config.utils";
 import { includingInactive } from "./support";
-
-const objectId = (id: string) => {
-  if (!isObjectIdString(id)) throw safePlaceNotFound();
-  return new ObjectId(id);
-};
 
 export const configResolvers: Resolvers = {
   Query: {
@@ -64,14 +57,14 @@ export const configResolvers: Resolvers = {
     updateSafePlace: async (_, { id, input, version }, ctx) => {
       await requirePlatformAdmin(ctx);
       return ctx.services.safePlaces.update(
-        objectId(id),
+        safePlaceIdOf(id),
         { ...input, hours: input.hours ?? null },
         version,
       );
     },
     deleteSafePlace: async (_, { id }, ctx) => {
       await requirePlatformAdmin(ctx);
-      return ctx.services.safePlaces.remove(objectId(id));
+      return ctx.services.safePlaces.remove(safePlaceIdOf(id));
     },
   },
   Country: {

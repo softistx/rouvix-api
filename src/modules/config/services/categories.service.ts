@@ -46,8 +46,10 @@ export class CategoriesService {
       input.parent === null
         ? undefined
         : await this.mongo.db.categories.findById(input.parent);
-    const hasChildren = await this.mongo.db.categories.exists({ parent: key });
-    const issues = categoryIssues(input, parent, hasChildren);
+    const children = await this.mongo.db.categories.findMany({
+      filter: { parent: key },
+    });
+    const issues = categoryIssues(input, parent, children);
     if (issues.length > 0) throw invalidInput(issues);
     return locked(false, () =>
       this.mongo.transaction(async (tx) => {

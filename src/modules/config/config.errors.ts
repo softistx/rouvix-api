@@ -1,4 +1,5 @@
-import { ConflictError } from "@softistx/mongo";
+import { ConflictError, isObjectIdString } from "@softistx/mongo";
+import { ObjectId } from "mongodb";
 import { defineCodes } from "@/i18n/define-codes";
 import { fail, failOnFields } from "@/shared/errors";
 import { locked as lock } from "@/shared/locked";
@@ -22,6 +23,12 @@ export const countryNotFound = (code: string, path = "countryCode") =>
     [{ path, code: "config.errors.country-not-found", params: { code } }],
     { status: 400, params: { code } },
   );
+
+// The ObjectId a safe place id names; an id of no valid shape names no place.
+export const safePlaceIdOf = (id: string) => {
+  if (!isObjectIdString(id)) throw safePlaceNotFound();
+  return new ObjectId(id);
+};
 
 export const safePlaceNotFound = () =>
   fail("config.errors.safe-place-not-found", { status: 404 });

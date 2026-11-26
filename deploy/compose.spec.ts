@@ -94,10 +94,7 @@ describe("the compose files are valid YAML with no key twice", () => {
       const keys = [...text.matchAll(/^ {2}([A-Z][A-Z0-9_]+): /gm)].map(
         (m) => m[1],
       );
-      const seen = new Set<string>();
-      const twice = keys.filter((key) =>
-        seen.has(key as string) ? true : (seen.add(key as string), false),
-      );
+      const twice = keys.filter((key, i) => keys.indexOf(key) !== i);
       expect(twice).toEqual([]);
     }
   });

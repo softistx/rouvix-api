@@ -67,9 +67,21 @@ export interface CategoryRulesInput {
 export function categoryIssues(
   input: CategoryRulesInput,
   parent: { parent: string | null; isDocument: boolean } | undefined,
-  hasChildren: boolean,
+  children: { isDocument: boolean }[],
 ): FieldIssue[] {
-  if (input.parent === null || input.parent === undefined) return [];
+  const hasChildren = children.length > 0;
+  if (input.parent === null || input.parent === undefined) {
+    // A root keeps its children of its own kind.
+    return children.some((child) => child.isDocument !== input.isDocument)
+      ? [
+          {
+            path: "isDocument",
+            code: "config.errors.category-parent-invalid",
+            params: { parent: input.key, reason: "document" },
+          },
+        ]
+      : [];
+  }
   const invalid = (reason: string): FieldIssue => ({
     path: "parent",
     code: "config.errors.category-parent-invalid",

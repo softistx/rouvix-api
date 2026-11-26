@@ -6,6 +6,7 @@ import {
   countryNotFound,
   geocodingUnavailable,
   locked,
+  safePlaceIdOf,
   safePlaceNotFound,
   staleVersion,
 } from "./config.errors";
@@ -39,6 +40,15 @@ describe("refusals", () => {
     expect(statusOf(safePlaceNotFound())).toEqual({ status: 404 });
     expect(statusOf(geocodingUnavailable())).toEqual({ status: 503 });
     expect(statusOf(staleVersion())).toEqual({ status: 409 });
+  });
+});
+
+describe("safePlaceIdOf", () => {
+  test("reads an ObjectId, and an id of another shape is no place", () => {
+    expect(safePlaceIdOf("6740a0000000000000000001").toHexString()).toBe(
+      "6740a0000000000000000001",
+    );
+    expect(() => safePlaceIdOf("nope")).toThrow();
   });
 });
 

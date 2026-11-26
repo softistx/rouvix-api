@@ -11,7 +11,10 @@ const place = {
 
 // A provider that never leaves the process: `fetch` is a list of answers, the
 // clock and the sleep are the spec's own.
-function setup(answers: (Response | Error)[], gap = 1_000) {
+function setup(
+  answers: (Response | Error)[],
+  extra: { maxQueued?: number } = {},
+) {
   const calls: { url: string; userAgent: string | null }[] = [];
   const sleeps: number[] = [];
   let time = 10_000;
@@ -19,7 +22,8 @@ function setup(answers: (Response | Error)[], gap = 1_000) {
     baseUrl: "https://nominatim.test",
     userAgent: "rouvix-api-spec/1.0 (contact: spec@rouvix.test)",
     cache: memoryGeocodeCache(),
-    minIntervalMs: gap,
+    minIntervalMs: 1_000,
+    ...extra,
     now: () => time,
     sleep: async (ms) => {
       sleeps.push(ms);
@@ -134,6 +138,42 @@ describe("the usage policy", () => {
     advance(5_000);
     await geocoder.search("two", { limit: 1 });
     expect(sleeps).toEqual([]);
+  });
+});
+
+describe("load", () => {
+  test("identical asks made at once share one request", async () => {
+    const { geocoder, calls } = setup([json([place])]);
+    const [a, b, c] = await Promise.all([
+      geocoder.search("akwa", { limit: 5 }),
+      geocoder.search("AKWA", { limit: 5 }),
+      geocoder.search("akwa ", { limit: 5 }),
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(a).toEqual(b);
+    expect(b).toEqual(c);
+  });
+
+  test("past the queue's depth an ask fails at once, a retryable error, and the others still run", async () => {
+    const { geocoder, calls } = setup([json([place]), json([place])], {
+      maxQueued: 2,
+    });
+    const asks = ["one", "two", "three"].map((q) =>
+      geocoder.search(q, { limit: 1 }).catch((e: unknown) => e),
+    );
+    const settled = await Promise.all(asks);
+    expect(settled[2]).toBeInstanceOf(GeocoderError);
+    expect((settled[2] as GeocoderError).retryable).toBe(true);
+    expect(Array.isArray(settled[0]) && Array.isArray(settled[1])).toBe(true);
+    expect(calls).toHaveLength(2);
+  });
+
+  test("a failed ask does not hold up the one behind it", async () => {
+    const { geocoder } = setup([json({}, 503), json([place])]);
+    const first = geocoder.search("one", { limit: 1 }).catch((e: unknown) => e);
+    const second = geocoder.search("two", { limit: 1 });
+    expect(await first).toBeInstanceOf(GeocoderError);
+    expect(await second).toHaveLength(1);
   });
 });
 
