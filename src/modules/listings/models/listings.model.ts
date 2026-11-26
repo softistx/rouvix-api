@@ -66,7 +66,23 @@ export const listings = defineCollection({
       radiusM: z.number().int().nullable().default(null),
       // A found item's whereabouts; null for a lost one.
       keptAt: keptAt.nullable().default(null),
+      // The town, as the author names it: a public filter, never an address.
+      city: z.string().trim().min(1).max(80).nullable().default(null),
     }),
+    // What search reads, derived from the content each time it is written
+    // (`storedFields`, listings.utils.ts) and never returned as it is: `searchText` is the
+    // words a visitor may match (never an ID document's text nor a place
+    // label), `cityKey` the town folded for an exact match, `geo` the point a
+    // visitor may filter and map by, blurred as a private place is shown.
+    searchText: z.string().max(4000).default(""),
+    cityKey: z.string().max(80).nullable().default(null),
+    geo: z
+      .object({
+        type: z.literal("Point"),
+        coordinates: z.tuple([z.number(), z.number()]),
+      })
+      .nullable()
+      .default(null),
     // The day it was lost or found, at UTC midnight.
     date: z.date(),
     questions: z
@@ -98,5 +114,17 @@ export const listings = defineCollection({
       sparse: true,
     },
     { key: { orgId: 1, status: 1 }, name: "listings_org" },
+    // Search (spec §5.4): the words, french and english alike (no stemming,
+    // accents and case folded), the point, and the filters in their usual order.
+    {
+      key: { searchText: "text" },
+      name: "listings_search_text",
+      default_language: "none",
+    },
+    { key: { geo: "2dsphere" }, name: "listings_search_geo" },
+    {
+      key: { status: 1, kind: 1, categoryKey: 1, date: -1 },
+      name: "listings_search_filters",
+    },
   ],
 });

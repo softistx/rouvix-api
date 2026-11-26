@@ -1,5 +1,6 @@
 export { codes, countryNotFound } from "./config.errors";
 export {
+  distanceM,
   fromGeoJson,
   type GeoPoint,
   toGeoJson,

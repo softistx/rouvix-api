@@ -20,6 +20,7 @@ import {
   OrganisationRelations,
   OrganisationsService,
 } from "./organisations";
+import { type ListingRanker, MapService, SearchService } from "./search";
 
 export interface ServiceDeps {
   // The database, as the request's viewer writes it (stamped as the actor).
@@ -35,6 +36,8 @@ export interface ServiceDeps {
   // The private bucket the photos live in, and where the photo job runs from.
   media: MediaBucket;
   background: Pick<Background, "run">;
+  // How a text search puts its matches in order, passed explicitly.
+  ranker: ListingRanker;
 }
 
 // The services of one request, wired to each other and to their ports.
@@ -57,6 +60,8 @@ export function services(deps: ServiceDeps & { viewer: Viewer | null }) {
       now: rest.now,
       background: rest.background,
     }),
+    search: new SearchService(mongo, { now: rest.now, ranker: rest.ranker }),
+    map: new MapService(mongo, { now: rest.now }),
     safePlaces: new SafePlacesService(mongo, countries),
     geocoding: new GeocodingService(rest.geocoder),
     accounts: new AccountsService(rest.auth, {

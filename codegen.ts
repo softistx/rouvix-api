@@ -37,6 +37,8 @@ const config: CodegenConfig = {
           // The config module's documents.
           Listing: "@/modules/listings#ListingDocument",
           PublicListing: "@/modules/listings#ListingDocument",
+          // A page of a search carries its filter, for its chip counts.
+          PublicListingConnection: "@/modules/search#SearchPage",
           Country: "@/modules/config#CountryDocument",
           Category: "@/modules/config#CategoryDocument",
           SafePlace: "@/modules/config#SafePlaceDocument",

@@ -11,12 +11,14 @@ import { serverGeocoder } from "./config/geocoder";
 import { serverMedia } from "./config/media";
 import { redis } from "./config/redis";
 import { serverSms } from "./config/sms";
+import { serverThrottle } from "./config/throttle";
 import type { Geocoder } from "./geocoder";
 import { type BaseOptions, createBase } from "./http/context";
 import { graphqlOptions, type ReportUnexpected } from "./http/graphql-endpoint";
 import { mediaApp } from "./http/media";
 import { noStoreMiddleware } from "./http/no-store";
 import { serverMailer } from "./mail/mailer";
+import { type ListingRanker, textRanker } from "./modules/search";
 import { cataloguesLoaded } from "./modules/translations";
 import type { Now } from "./shared/dates";
 import type { SmsSender } from "./sms";
@@ -26,6 +28,7 @@ export type AppOptions = Partial<Omit<BaseOptions, "trusted">> & {
   auth?: Auth;
   sms?: SmsSender;
   geocoder?: Geocoder;
+  ranker?: ListingRanker;
   media?: MediaBucket;
   mailer?: Mailer;
   catalogues?: () => boolean;
@@ -41,16 +44,18 @@ export function createApp(options: AppOptions = {}) {
   const auth = options.auth ?? serverAuth();
   const sms = options.sms ?? serverSms();
   const geocoder = options.geocoder ?? serverGeocoder();
+  const ranker = options.ranker ?? textRanker;
   const media = options.media ?? serverMedia;
   const mailer = options.mailer ?? serverMailer(env.MAIL_URL);
   const cataloguesReady = options.catalogues ?? cataloguesLoaded;
   const now = options.now ?? (() => new Date());
   const access = options.access ?? janusAccess(auth);
-  const deps = { mongo, auth, sms, mailer, geocoder, media, now };
+  const deps = { mongo, auth, sms, mailer, geocoder, media, ranker, now };
   return createBase({
     resolveViewer: options.resolveViewer ?? janusViewer(auth),
     access,
     organisations: options.organisations ?? organisationDirectory(mongo),
+    throttle: options.throttle ?? serverThrottle(),
     trusted: env.TRUSTED_PROXIES,
     proxySecret: options.proxySecret ?? env.PROXY_SECRET,
   })

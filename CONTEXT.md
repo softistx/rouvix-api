@@ -48,6 +48,7 @@ changes meaning: a new case gets a new code.
 | `organisations.errors.invitation-invalid`     | A token unknown, expired, or for another phone than the signed-in account's.                                                                                              | 404    |
 | `organisations.errors.last-admin`             | Removing or demoting the organisation's only active administrator.                                                                                                        | 409    |
 | `organisations.errors.stale-version`          | Writes on the organisation kept conflicting beyond the retry budget (about 2 s); repeat the call.                                                                         | 409    |
+| `throttle.errors.too-many`                    | A public read (search, map) past the address's budget: 120 a minute, 40 at once; `retryAfter` in seconds and `minutes`.                                                   | 429    |
 
 Field codes: raised in `extensions.fields` beside the top-level code of the call.
 

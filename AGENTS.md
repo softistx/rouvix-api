@@ -35,7 +35,7 @@ plugin's (`build-an-alxia-graphql-api`, `add-a-module`, its `conventions-reviewe
 `src/` has the entry points at its root (`server.ts`, `app.ts`, its spec) and a folder per
 concern: `config` (env, db, redis, sms, auth), `http` (context, schema, csrf, limits),
 `auth` (`auth.ts` janus, `access.ts`, `guards.ts`), `tenancy` (`scoped()`, the directory),
-`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder` and `storage` (the ports' adapters), `shared`,
+`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder`, `throttle` and `storage` (the ports' adapters), `shared`,
 `migrations` (with its `kit/`), `scripts` and `modules`. A module is `modules/<name>/`:
 flat for one entity, a folder per role (`graphql/`, `models/`, `services/`, `resolvers/`)
 for several, with `<name>.errors.ts` (+ spec), `.rules.ts`, `.utils.ts`, `.janus.ts` and an
@@ -68,7 +68,7 @@ of a service, a resolver or a data-loader: it goes to the module's `utils`, `rul
 
 ## Ports
 
-`SmsSender` (`src/sms`: the log adapter, Africa's Talking), `Mailer`, `Geocoder` and the photos' `MediaBucket` (`src/storage`) are passed explicitly
+`SmsSender` (`src/sms`: the log adapter, Africa's Talking), `Mailer`, `Geocoder`, `Throttle` (`src/throttle`: Redis rate limits, fail open for visitor reads; `memoryThrottle` in `test/throttle.ts`), the search's `ListingRanker` (plain text ranking until slice 6's embeddings) and the photos' `MediaBucket` (`src/storage`) are passed explicitly
 and never defaulted but by `createApp`, from the environment (`SMS_PROVIDER`; the log adapter is
 refused in production). A spec passes `memorySmsSender` (`test/sms.ts`) and the memory mailer.
 
@@ -133,10 +133,20 @@ is held in a SCREAMING_SNAKE_CASE constant. Assert `extensions.code`, never the 
 - Writes of a listing replace its content whole (a field given is the new value) under `version`,
   as the config module's do, rather than patching: the author's form always holds the whole. A
   declaration reports the content's issues together; an unknown country is the one early refusal.
-- Until the Throttle port exists an account may upload thirty photos an hour; an upload never
+- An account may upload thirty photos an hour (counted per account, not yet on the Throttle port); an upload never
   attached to a listing is not swept yet (a later slice). A photo that fails to settle is retried
   three times by the job and left pending (any later update of the listing settles it again); the
   removal of an ID document's photos at close is tried three times per photo and a failure is
   logged, the orphan sweep taking what remains.
 - A found item may be kept at an organisation only in that organisation's register; `AT_POLICE` is
   the author's word until a safe place is linked to the listing.
+
+## Search and the map
+
+- `searchListings` and `mapListings` are public: no guard, `throttleVisitor(ctx)` first (the
+  `throttle.errors.*` namespace is shared, like `auth` and `validation`).
+- They read the derived fields of `listings` (`searchText`, `cityKey`, `geo`), written with the
+  content by `storedFields` and never returned: an ID document's `searchText` is its type only, a
+  place label is never searched, and `geo` is the public point snapped to about 220 m. Never query
+  `place.point`. `search.schema.spec.ts` and `search.leak.e2e.spec.ts` guard this.
+- `search.ranking.ts` holds the `ListingRanker` port (the ranking role).

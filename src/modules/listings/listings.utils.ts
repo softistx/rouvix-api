@@ -61,6 +61,61 @@ export const publicPoint = (
     ? point
     : blurredPoint(point);
 
+// The grid a private point is snapped to for search and the map: 0.002 degrees,
+// about 220 m. It snaps the point the public view already shows (three
+// decimals), so the map and the filters give away nothing the view does not.
+const GRID_DEG = 0.002;
+const snap = (value: number) =>
+  round(Math.round(value / GRID_DEG) * GRID_DEG, 3);
+
+// The point a visitor may filter and map by: where the item is kept when that
+// is a public place, else the blurred point snapped to about 220 m. Never the
+// exact point of a private place, a lost item's included.
+export const searchPoint = (
+  point: GeoPoint,
+  keptAt: KeptAt | null,
+): GeoPoint => {
+  const shown = publicPoint(point, keptAt);
+  return keptAt === "AT_POLICE" || keptAt === "AT_ORGANISATION"
+    ? shown
+    : { latitude: snap(shown.latitude), longitude: snap(shown.longitude) };
+};
+
+// A town folded to compare: no accent, no case, single spaces. null for none.
+export const cityKeyOf = (city: string | null | undefined): string | null => {
+  const key = (city ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  return key === "" ? null : key;
+};
+
+// The words a visitor's text matches. An ID document has no free text in
+// public (the masked view returns none), so none is searchable: only its type.
+export const searchTextOf = (content: {
+  documentType?: string | null | undefined;
+  title: string;
+  description?: string | null | undefined;
+  attributes: {
+    colours: readonly string[];
+    brand?: string | null | undefined;
+    marks?: string | null | undefined;
+  };
+}): string =>
+  content.documentType
+    ? content.documentType
+    : [
+        content.title,
+        content.description,
+        content.attributes.brand,
+        content.attributes.marks,
+        ...content.attributes.colours,
+      ]
+        .filter((part): part is string => !!part)
+        .join(" ");
+
 // What an author states of a listing (stated whole on an update).
 export interface ListingContent {
   countryCode: string;
@@ -79,6 +134,7 @@ export interface ListingContent {
     point: GeoPoint;
     radiusM?: number | null | undefined;
     keptAt?: KeptAt | null | undefined;
+    city?: string | null | undefined;
   };
   // `YYYY-MM-DD`, the Date scalar.
   date: string;
@@ -112,7 +168,14 @@ export function storedFields(
       point: toGeoJson(content.place.point),
       radiusM: content.place.radiusM ?? null,
       keptAt: content.place.keptAt ?? null,
+      city: content.place.city?.trim() || null,
     },
+    searchText: searchTextOf(content),
+    // An ID document's town could be its holder's: never searchable.
+    cityKey: content.documentType ? null : cityKeyOf(content.place.city),
+    geo: toGeoJson(
+      searchPoint(content.place.point, content.place.keptAt ?? null),
+    ),
     date: dayOfString(content.date),
     questions: content.questions,
   };

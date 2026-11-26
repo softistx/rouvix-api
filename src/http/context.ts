@@ -13,6 +13,7 @@ import { i18n } from "../i18n";
 import type { Services } from "../modules";
 import { unavailable } from "../shared/errors";
 import type { OrganisationDirectory } from "../tenancy";
+import type { Throttle } from "../throttle";
 import { clientIp } from "./client-ip";
 import { noStoreHeaders } from "./no-store";
 
@@ -33,6 +34,9 @@ export interface BaseOptions {
   access?: Access;
   // How a guard finds an organisation by its slug.
   organisations: OrganisationDirectory;
+  // What counts the reads an address makes (the Throttle port), passed
+  // explicitly by src/app.ts, never defaulted here.
+  throttle: Throttle;
 }
 
 // The base: what every resolver reads, decorated or derived here: `env`,
@@ -45,6 +49,7 @@ export function createBase(options: BaseOptions) {
     resolveViewer = anonymous,
     access = denyAll,
     organisations,
+    throttle,
   } = options;
   // `viewer` is the account the request names, or null. A query may be
   // anonymous, so this refuses nothing; a resolver that needs a viewer refuses
@@ -72,7 +77,7 @@ export function createBase(options: BaseOptions) {
     ...(proxySecret === undefined &&
       trusted && { proxy: trustProxy({ trusted, untrusted: "refuse" }) }),
   })
-    .decorate({ env, access, organisations })
+    .decorate({ env, access, organisations, throttle })
     .use(i18n)
     .use(viewerOf);
 }
