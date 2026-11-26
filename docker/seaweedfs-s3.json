@@ -1,0 +1,11 @@
+{
+  "identities": [
+    {
+      "name": "rouvix-dev",
+      "credentials": [
+        { "accessKey": "rouvix-dev", "secretKey": "rouvix-dev-secret" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

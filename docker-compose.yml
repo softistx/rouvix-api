@@ -1,0 +1,115 @@
+# Development services: a one-node MongoDB replica set (which @softistx/mongo's
+# transactions need) at mongodb://localhost:27017/?replicaSet=rs0 with
+# directConnection=true, Redis at redis://localhost:6379 and an S3 gateway
+# (SeaweedFS) at http://localhost:8333. `bun run services:up` starts them and
+# initiates the replica set. Every service is capped (deploy.resources.limits)
+# and its healthcheck is a plain TCP or HTTP check, not a shell run every few
+# seconds. Host ports come from .env (MONGO_PORT, REDIS_PORT, S3_PORT).
+services:
+  mongo:
+    image: mongo:8
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo-data:/data/db
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/27017"]
+      interval: 30s
+      start_interval: 2s
+      start_period: 60s
+      timeout: 5s
+      retries: 5
+
+  # One-shot, run after `up -d --wait mongo redis s3`: initiates the one-node
+  # replica set (no auth here) and waits for a primary, so transactions work.
+  # In a profile so a plain `docker compose up --wait` neither starts it nor
+  # fails on its exit.
+  mongo-init:
+    image: mongo:8
+    profiles: [init]
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+    command:
+      - sh
+      - -c
+      - |
+        n=0
+        until mongosh "mongodb://mongo:27017/?directConnection=true" --quiet --eval "try { rs.status() } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] }) }; quit(db.hello().isWritablePrimary ? 0 : 1)"; do
+          n=$$((n + 1))
+          [ "$$n" -ge 60 ] && exit 1
+          sleep 2
+        done
+
+  redis:
+    image: redis:7.4
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      start_interval: 2s
+      start_period: 10s
+      timeout: 3s
+      retries: 5
+
+  # One process for master, volume, filer and S3 gateway, with small volumes
+  # so it needs no more memory or disk than a dev machine spares. The
+  # identities file gives the dev key rouvix-dev / rouvix-dev-secret. No bucket
+  # CORS rule is needed: only the server reaches the bucket.
+  s3:
+    image: chrislusf/seaweedfs:4.55
+    command:
+      - server
+      - -dir=/data
+      - -s3
+      - -s3.port=8333
+      - -s3.config=/etc/seaweedfs/s3.json
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
+      - -master.volumeSizeLimitMB=64
+      - -volume.max=100
+      - -ip=127.0.0.1
+      - -ip.bind=0.0.0.0
+    ports:
+      - "127.0.0.1:${S3_PORT:-8333}:8333"
+    volumes:
+      - s3-data:/data
+      - ./docker/seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -S -O /dev/null http://127.0.0.1:8333/ 2>&1 | grep -q HTTP",
+        ]
+      interval: 30s
+      start_interval: 2s
+      start_period: 20s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo-data:
+  s3-data:

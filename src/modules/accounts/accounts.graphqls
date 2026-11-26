@@ -1,0 +1,52 @@
+"""
+The roles an account holds over the platform. Every account is a `USER`; a
+platform admin is a `MODERATOR` too. A role in an organisation is an
+`OrganisationRole`, held through a membership.
+"""
+enum PlatformRole {
+  "A signed-in account: declares, claims, chats, reports."
+  USER
+  "Named by the platform admin: reports, organisation verification, suspensions."
+  MODERATOR
+  "The owner of the platform: a moderator's rights plus moderators and settings."
+  PLATFORM_ADMIN
+}
+
+"""
+An account, as its holder sees it. Reachable through `Viewer.account` only, and
+so only ever the signed-in account's own: its phone number is returned to
+nobody else (spec §8; `accounts.schema.spec.ts` walks the schema for it).
+"""
+type Account {
+  id: ID!
+  displayName: String!
+  "The account's own number, E.164. Never public."
+  phone: String!
+  locale: Language!
+  "ISO 3166-1 alpha-2."
+  countryCode: String!
+  "0 to 100; moderation weighs reports and claims with it."
+  trustScore: Int!
+  finderBadge: Boolean!
+  "When a moderator suspended the account; null when it is not. A suspended account passes no guard (`accounts.errors.suspended`)."
+  suspendedAt: DateTime
+  createdAt: DateTime!
+}
+
+"The signed-in caller: their account, and what they hold."
+type Viewer {
+  account: Account!
+  "The platform roles, `USER` first."
+  roles: [PlatformRole!]! @listSize(assumedSize: 3)
+  "When the request's session ends, after any renewal."
+  sessionExpiresAt: DateTime
+}
+
+type Query {
+  """
+  The signed-in account and its roles and organisations; null for an anonymous
+  request. A suspended account is still answered, with `suspendedAt` set, so
+  the client can tell it. Needs no guard: it reads the caller's own account.
+  """
+  viewer: Viewer
+}

@@ -1,0 +1,168 @@
+"What an organisation is: it sets its kind in its public page and the way it is found."
+enum OrganisationKind {
+  TOWN_HALL
+  POLICE
+  STATION
+  SCHOOL
+  HOTEL
+  OTHER
+}
+
+"The role of a member inside one organisation."
+enum OrganisationRole {
+  "Works the register: intake, storage, handover, destruction."
+  AGENT
+  "An agent's rights, plus members, the public page and settings."
+  ADMIN
+}
+
+"Whether a member has accepted their invitation."
+enum MemberStatus {
+  INVITED
+  ACTIVE
+}
+
+"""
+An organisation, the tenant of its members and, later, of its register. Its
+`slug` names it in the UI at `/:slug`.
+"""
+type Organisation {
+  id: ID!
+  slug: String!
+  name: String!
+  kind: OrganisationKind!
+  city: String!
+  "ISO 3166-1 alpha-2."
+  countryCode: String!
+  "When the platform granted the verified badge; null while unverified."
+  verifiedAt: DateTime
+  createdAt: DateTime!
+}
+
+"The viewer's place in one organisation."
+type OrganisationMembership {
+  organisation: Organisation!
+  role: OrganisationRole!
+}
+
+"""
+A member of an organisation, or a person invited to it. The phone number is
+masked (`+237••••••••01`): an administrator tells two invitations apart and
+learns nothing more; the whole number is its holder's, through `Viewer.account`.
+"""
+type Member {
+  id: ID!
+  phoneMasked: String!
+  role: OrganisationRole!
+  status: MemberStatus!
+  createdAt: DateTime!
+}
+
+type MemberEdge {
+  node: Member!
+}
+
+type MemberConnection {
+  edges: [MemberEdge!]! @listSize(assumedSize: 100)
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input CreateOrganisationInput {
+  name: String! @constraint(minLength: 2, maxLength: 120)
+  kind: OrganisationKind!
+  "Lower case letters, digits and single dashes; names the organisation in `/:slug`."
+  slug: String!
+    @constraint(
+      minLength: 2
+      maxLength: 63
+      pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+    )
+  city: String! @constraint(minLength: 1, maxLength: 120)
+}
+
+"An invitation as it is issued."
+type InviteMemberPayload {
+  member: Member!
+  """
+  The invitation token, shown once (only its hash is kept): hand it to the
+  invited person, who gives it to `acceptMembership` signed in with the invited
+  phone. It is useless to any other account. A new invitation to the same phone
+  replaces it. Valid for 7 days.
+  """
+  token: String!
+}
+
+extend type Viewer {
+  "The organisations the viewer works in, with their role in each."
+  organisations: [OrganisationMembership!]! @listSize(assumedSize: 20)
+}
+
+extend type Query {
+  """
+  An organisation the viewer works in. Needs an agent or an administrator of it:
+  401 without a viewer, 403 `accounts.errors.suspended`, and 404
+  `organisations.errors.organisation-not-found` for an unknown slug and for an
+  organisation the viewer is no member of alike.
+  """
+  organisation(
+    slug: String! @constraint(minLength: 2, maxLength: 63)
+  ): Organisation!
+  """
+  The members and pending invitations of an organisation, oldest first. Needs an
+  administrator of it (403 `auth.errors.forbidden` for an agent; the 401, 403 and
+  404 of `organisation`).
+  """
+  organisationMembers(
+    slug: String! @constraint(minLength: 2, maxLength: 63)
+    first: Int = 20 @constraint(min: 1, max: 100)
+    after: String
+  ): MemberConnection!
+}
+
+type Mutation {
+  """
+  Makes an organisation, its creator becoming its administrator. Needs a signed-in,
+  unsuspended account. Refusals: `organisations.errors.slug-reserved` (400, on `slug`: the slug is one of the UI's own routes), `organisations.errors.slug-taken` (409, on `slug`).
+  """
+  createOrganisation(input: CreateOrganisationInput!): Organisation!
+  """
+  Invites a phone number as `role`, or sends a new invitation to a phone already
+  invited. Needs an administrator (the refusals of `organisationMembers`); a
+  `phone` that is no number is `validation.errors.invalid-format` on `phone`, a
+  phone already a member `organisations.errors.already-member` (409). Sends no
+  SMS: the token is returned.
+  """
+  inviteMember(
+    slug: String! @constraint(minLength: 2, maxLength: 63)
+    phone: String! @constraint(minLength: 8, maxLength: 24)
+    role: OrganisationRole!
+  ): InviteMemberPayload!
+  """
+  Accepts the invitation `token` names, as the account whose phone was invited.
+  Needs a signed-in, unsuspended account; an unknown, expired or somebody else's
+  token is `organisations.errors.invitation-invalid` (404). Repeating it is harmless.
+  """
+  acceptMembership(
+    token: String! @constraint(minLength: 40, maxLength: 128)
+  ): OrganisationMembership!
+  """
+  Gives a member a role. Needs an administrator; `organisations.errors.member-not-found`
+  (404) for a member of no such organisation, `organisations.errors.last-admin` (409)
+  for the last administrator being demoted.
+  """
+  setMemberRole(
+    slug: String! @constraint(minLength: 2, maxLength: 63)
+    memberId: ID!
+    role: OrganisationRole!
+  ): Member!
+  """
+  Removes a member or withdraws an invitation, returning the member's id. Needs an
+  administrator; the refusals of `setMemberRole`, `last-admin` for the last
+  administrator being removed.
+  """
+  removeMember(
+    slug: String! @constraint(minLength: 2, maxLength: 63)
+    memberId: ID!
+  ): ID!
+}

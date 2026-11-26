@@ -1,0 +1,303 @@
+# ── rouvix-api, on the VPS ────────────────────────────────────────────────────
+#
+# One stack, six containers: mongo (a one-node replica set, auth on), its
+# one-shot init, redis, an S3 gateway, the API with its migration one-shot.
+# Run it with `bun deploy/deploy.ts` (build, migrate, up, prune); by hand, from
+# this folder:
+#
+#   cp .env.example .env     # fill every CHANGE_ME, chmod 600
+#   docker compose build && docker compose run --rm api-migrate && docker compose up -d --wait
+#
+# - No `ports:` anywhere and no hostname: the API has none. rouvix-ui's BFF
+#   reaches it by container name on the external `edge` network, with the
+#   proxy secret (API_PROXY_SECRET). mongo, redis and the S3 gateway are on
+#   `internal` alone, which has no egress.
+# - Every service, one-shots included, has `deploy.resources.limits`, sized to
+#   what it really uses with headroom; healthchecks are a TCP or HTTP check
+#   written in the image's own tools (no mongosh or bun run every few seconds).
+# - Secrets are `${X:?}`: compose refuses to start with one missing.
+# - Two Mongo credentials: the app user (readWrite, what `api` runs with) and
+#   the migrate user (plus dbAdmin, what `api-migrate` and `admin:create` run
+#   with; the API never syncs in production). The root user exists only to
+#   create them. The replica set member is named after the container.
+# - `api` refuses to start on a pending migration, so `api-migrate` (db:sync,
+#   then db:migrate) runs first. An upgrade is not zero-downtime.
+
+name: rouvix
+
+networks:
+  edge:
+    external: true
+    name: ${EDGE_NETWORK:-rouvix-edge}
+  internal:
+    name: rouvix-internal
+    internal: true
+
+# The read token of the @softistx packages, for `bun install` in the image
+# build only (a BuildKit secret mount: never an ARG, ENV or layer).
+secrets:
+  npm_read:
+    environment: NPM_SOFTISTX_READ_TOKEN
+
+volumes:
+  mongo-data:
+  redis-data:
+  s3-data:
+
+x-common: &common
+  restart: unless-stopped
+
+x-oneshot: &oneshot
+  restart: "no"
+
+x-limits-api: &limits-api
+  resources:
+    limits:
+      cpus: "1"
+      memory: 768M
+x-limits-mongo: &limits-mongo
+  resources:
+    limits:
+      cpus: "1"
+      memory: 1G
+x-limits-half: &limits-half
+  resources:
+    limits:
+      cpus: "0.5"
+      memory: 512M
+x-limits-small: &limits-small
+  resources:
+    limits:
+      cpus: "0.25"
+      memory: 256M
+
+x-api-env: &api-env
+  NODE_ENV: production
+  UI_URL: ${PUBLIC_SCHEME:-https}://${UI_HOSTNAME:?}
+  MAIL_FROM: ${MAIL_FROM:?}
+  MAIL_URL: ${MAIL_URL:?}
+  REDIS_URL: redis://:${REDIS_PASSWORD:?}@rouvix-redis:6379
+  # The UI's API_PROXY_SECRET (32 characters or more). Not with TRUSTED_PROXIES.
+  PROXY_SECRET: ${API_PROXY_SECRET:?}
+  SMS_PROVIDER: africastalking
+  AT_USERNAME: ${AT_USERNAME:?}
+  AT_API_KEY: ${AT_API_KEY:?}
+  AT_SENDER_ID: ${AT_SENDER_ID:?}
+
+services:
+  # ── data ────────────────────────────────────────────────────────────────────
+  mongo:
+    <<: *common
+    networks: [internal]
+    image: mongo:8.0
+    container_name: rouvix-mongo
+    deploy: *limits-mongo
+    # mongod would be PID 1 and never reap what its exec sessions leave: tini,
+    # as PID 1, reaps them.
+    init: true
+    # Auth on a replica set needs a keyfile, written from MONGO_KEYFILE at each
+    # start (mongod insists on mode 400 and its own owner), so nothing secret
+    # lives in the image or the repository.
+    entrypoint:
+      - bash
+      - -c
+      - |
+        printf '%s' "$$MONGO_KEYFILE" > /tmp/mongo-keyfile
+        chmod 400 /tmp/mongo-keyfile
+        chown mongodb:mongodb /tmp/mongo-keyfile
+        exec docker-entrypoint.sh "$$@"
+      - --
+    command: [
+        "mongod",
+        "--replSet",
+        "rs0",
+        "--bind_ip_all",
+        "--keyFile",
+        "/tmp/mongo-keyfile",
+        # Inside the 1G cap: the default cache is sized from the host's RAM.
+        "--wiredTigerCacheSizeGB",
+        "0.25",
+      ]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?}
+      MONGO_KEYFILE: ${MONGO_KEYFILE:?}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # A bash TCP connect to mongod: no mongosh per check. It only says mongod
+      # listens; `mongo-init` initiates the replica set and waits for a primary.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/27017"]
+      interval: 30s
+      start_interval: 2s
+      start_period: 60s
+      timeout: 5s
+      retries: 5
+
+  mongo-init:
+    <<: *oneshot
+    networks: [internal]
+    image: mongo:8.0
+    container_name: rouvix-mongo-init
+    deploy: *limits-small
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      DIRECT_URI: mongodb://rouvix-mongo:27017/admin?directConnection=true
+      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?}
+      MONGO_RS_HOST: rouvix-mongo
+      ROOT_URI: mongodb://root:${MONGO_ROOT_PASSWORD:?}@rouvix-mongo:27017/admin?replicaSet=rs0
+      APP_USER: ${MONGO_APP_USER:-rx_app}
+      APP_PASSWORD: ${MONGO_APP_PASSWORD:?}
+      MIGRATE_USER: ${MONGO_MIGRATE_USER:-rx_migrate}
+      MIGRATE_PASSWORD: ${MONGO_MIGRATE_PASSWORD:?}
+    # Idempotent: initiates the replica set when it is not, waits for a primary,
+    # then sets each user's password and roles again, so a rotated secret in
+    # .env is applied by `up`.
+    command:
+      - sh
+      - -c
+      - |
+        n=0
+        until mongosh "$$DIRECT_URI" --quiet --eval '
+          db.getSiblingDB("admin").auth("root", process.env.MONGO_ROOT_PASSWORD);
+          try { rs.status() } catch (e) { rs.initiate({ _id: "rs0", members: [{ _id: 0, host: process.env.MONGO_RS_HOST + ":27017" }] }) }
+          quit(db.hello().isWritablePrimary ? 0 : 1)
+        '; do
+          n=$$((n + 1))
+          [ "$$n" -ge 60 ] && { echo "mongo-init: no primary after 60 tries" >&2; exit 1; }
+          sleep 2
+        done
+        mongosh --nodb --quiet --eval '
+          const admin = new Mongo(process.env.ROOT_URI).getDB("admin");
+          const upsert = (user, pwd, roles) =>
+            admin.getUser(user) ? admin.updateUser(user, { pwd, roles }) : admin.createUser({ user, pwd, roles });
+          upsert(process.env.APP_USER, process.env.APP_PASSWORD, [{ role: "readWriteAnyDatabase", db: "admin" }]);
+          upsert(process.env.MIGRATE_USER, process.env.MIGRATE_PASSWORD, [{ role: "readWriteAnyDatabase", db: "admin" }, { role: "dbAdminAnyDatabase", db: "admin" }]);
+          print("users ready");
+        '
+
+  redis:
+    <<: *common
+    networks: [internal]
+    image: redis:7.4
+    container_name: rouvix-redis
+    deploy: *limits-small
+    init: true
+    # The password goes into a config file written at each start, so it is in
+    # no argument list (docker inspect, ps).
+    entrypoint:
+      - bash
+      - -c
+      - |
+        printf 'requirepass %s\n' "$$REDIS_PASSWORD" > /tmp/redis.conf
+        chmod 400 /tmp/redis.conf
+        chown redis:redis /tmp/redis.conf
+        exec docker-entrypoint.sh "$$@"
+      - --
+    command: ["redis-server", "/tmp/redis.conf", "--appendonly", "yes"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 30s
+      start_interval: 2s
+      start_period: 10s
+      timeout: 3s
+      retries: 5
+
+  # The S3 gateway of the private bucket the photos will live in (a later
+  # slice). Private: only the API reaches it, so on `internal` alone. The
+  # identities file is written from the environment at each start.
+  s3:
+    <<: *common
+    networks: [internal]
+    image: chrislusf/seaweedfs:4.55
+    container_name: rouvix-s3
+    deploy: *limits-half
+    entrypoint:
+      - sh
+      - -c
+      - |
+        printf '{"identities":[{"name":"rouvix","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" > /tmp/s3.json
+        exec weed "$$@"
+      - --
+    command:
+      - server
+      - -dir=/data
+      - -s3
+      - -s3.port=8333
+      - -s3.config=/tmp/s3.json
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
+      - -master.volumeSizeLimitMB=256
+      - -volume.max=100
+      - -ip=127.0.0.1
+      - -ip.bind=0.0.0.0
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+    volumes:
+      - s3-data:/data
+    healthcheck:
+      # Healthy once the S3 gateway answers (any HTTP status).
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -S -O /dev/null http://127.0.0.1:8333/ 2>&1 | grep -q HTTP",
+        ]
+      interval: 30s
+      start_interval: 2s
+      start_period: 20s
+      timeout: 5s
+      retries: 5
+
+  # ── the API ─────────────────────────────────────────────────────────────────
+  api-migrate:
+    <<: *oneshot
+    networks: [internal, edge]
+    image: rouvix-api:${TAG:-local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      secrets: [npm_read]
+    container_name: rouvix-api-migrate
+    deploy: *limits-half
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *api-env
+      MONGO_URI: mongodb://${MONGO_MIGRATE_USER:-rx_migrate}:${MONGO_MIGRATE_PASSWORD:?}@rouvix-mongo:27017/${MONGO_DATABASE:-rouvix}?replicaSet=rs0&authSource=admin
+    command:
+      [
+        "sh",
+        "-c",
+        "bun --no-install src/scripts/db-sync.ts && bun --no-install src/scripts/db-migrate.ts",
+      ]
+
+  api:
+    <<: *common
+    networks: [internal, edge]
+    image: rouvix-api:${TAG:-local}
+    container_name: rouvix-api
+    deploy: *limits-api
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      s3:
+        condition: service_healthy
+    environment:
+      <<: *api-env
+      MONGO_URI: mongodb://${MONGO_APP_USER:-rx_app}:${MONGO_APP_PASSWORD:?}@rouvix-mongo:27017/${MONGO_DATABASE:-rouvix}?replicaSet=rs0&authSource=admin
+      PORT: "3000"
+    # The image's own HEALTHCHECK (bash, a request on /ready every 30 s) stands:
+    # nothing to run per check but the shell.

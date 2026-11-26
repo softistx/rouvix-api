@@ -1,0 +1,15 @@
+{
+  "auth.errors.unauthenticated": "Connectez-vous pour continuer.",
+  "auth.errors.forbidden": "Vous n'avez pas le droit de faire cela.",
+  "auth.errors.unavailable": "Le service de connexion est momentanément indisponible. Réessayez dans un instant.",
+  "auth.errors.client-header-required": "L'en-tête {header} est obligatoire.",
+  "validation.errors.invalid-input": "Certains champs sont à corriger.",
+  "validation.errors.required": "Ce champ est obligatoire.",
+  "validation.errors.invalid": "Cette valeur n'est pas valide.",
+  "validation.errors.invalid-format": "Ce format n'est pas valide.",
+  "validation.errors.too-short": "Cette valeur est trop courte.",
+  "validation.errors.too-long": "Cette valeur est trop longue.",
+  "validation.errors.out-of-range": "Cette valeur est hors des limites permises.",
+  "validation.errors.too-few": "Il n'y a pas assez d'éléments.",
+  "validation.errors.too-many": "Il y a trop d'éléments."
+}

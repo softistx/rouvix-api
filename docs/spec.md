@@ -44,14 +44,14 @@ are in `../.handover/design-decisions.md` (settled with the owner on 2026-11-25)
   `scoped()`; a spec per module proves another organisation gets `not-found`.
 - **Roles**:
 
-| Role | Who | May |
-| --- | --- | --- |
-| visitor | no account | search, map, public listing detail, org public pages, verify a loss receipt |
-| `USER` | phone-verified account | declare, claim, chat, hand over, review, report, save alerts, download receipts and posters |
-| org `AGENT` | member of an organisation | the register (intake, storage, handover, destruction), publish register items as found listings, answer claims on them |
-| org `ADMIN` | member of an organisation | an agent's rights, plus members, the public page and org settings; asks for verification |
-| `MODERATOR` | named by the platform admin | reports, org verification, account suspension, the audit log |
-| `PLATFORM_ADMIN` | the owner | a moderator's rights, plus moderators, countries, categories and platform settings |
+| Role             | Who                         | May                                                                                                                    |
+| ---------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| visitor          | no account                  | search, map, public listing detail, org public pages, verify a loss receipt                                            |
+| `USER`           | phone-verified account      | declare, claim, chat, hand over, review, report, save alerts, download receipts and posters                            |
+| org `AGENT`      | member of an organisation   | the register (intake, storage, handover, destruction), publish register items as found listings, answer claims on them |
+| org `ADMIN`      | member of an organisation   | an agent's rights, plus members, the public page and org settings; asks for verification                               |
+| `MODERATOR`      | named by the platform admin | reports, org verification, account suspension, the audit log                                                           |
+| `PLATFORM_ADMIN` | the owner                   | a moderator's rights, plus moderators, countries, categories and platform settings                                     |
 
 - Guards (in `src/auth` only): `requireUser`, `requireOrgAgent(slug)`,
   `requireOrgAdmin(slug)`, `requireModerator`, `requirePlatformAdmin`. A suspended
@@ -63,18 +63,18 @@ are in `../.handover/design-decisions.md` (settled with the owner on 2026-11-25)
 Every outside service sits behind a module port, passed explicitly (never defaulted),
 with a fake in specs.
 
-| Port | v1 adapter | Notes |
-| --- | --- | --- |
-| `SmsSender` | Africa's Talking (HTTP) | sends the sign-in code; per-country sender id; a log adapter in development |
-| `Mailer` | `@softistx/mail` + `@softistx/mail-smtp` | fallback for the sign-in code once an e-mail is verified; notifications |
-| `Ocr` | a Tesseract HTTP sidecar on the VPS (`ocr` service, fra + eng) | text and boxes of an ID photo; never a remote service |
-| `ImageRedactor` | local, in the worker process | strong blur of an ID photo, EXIF stripped from every photo |
-| `ObjectDescriber` | Claude through `@softistx/ai-anthropic` (`generateObject`) | photos of objects only (§4.3) |
-| `Embedder` | Ollama `nomic-embed-text` on the VPS through `@softistx/ai-ollama` (embeddings port, softistx/ai#205) | 768 dimensions |
-| `Geocoder` | Nominatim (OpenStreetMap), cached in Redis | place search and reverse geocoding; usage policy respected (1 req/s, own User-Agent) |
-| `PushSender` | Web Push (VAPID keys from the environment) | |
-| `Throttle` | `@softistx/redis` | fail closed for sign-in codes, open elsewhere |
-| `Clock` | system clock | passed to every job and rule |
+| Port              | v1 adapter                                                                                            | Notes                                                                                |
+| ----------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `SmsSender`       | Africa's Talking (HTTP)                                                                               | sends the sign-in code; per-country sender id; a log adapter in development          |
+| `Mailer`          | `@softistx/mail` + `@softistx/mail-smtp`                                                              | fallback for the sign-in code once an e-mail is verified; notifications              |
+| `Ocr`             | a Tesseract HTTP sidecar on the VPS (`ocr` service, fra + eng)                                        | text and boxes of an ID photo; never a remote service                                |
+| `ImageRedactor`   | local, in the worker process                                                                          | strong blur of an ID photo, EXIF stripped from every photo                           |
+| `ObjectDescriber` | Claude through `@softistx/ai-anthropic` (`generateObject`)                                            | photos of objects only (§4.3)                                                        |
+| `Embedder`        | Ollama `nomic-embed-text` on the VPS through `@softistx/ai-ollama` (embeddings port, softistx/ai#205) | 768 dimensions                                                                       |
+| `Geocoder`        | Nominatim (OpenStreetMap), cached in Redis                                                            | place search and reverse geocoding; usage policy respected (1 req/s, own User-Agent) |
+| `PushSender`      | Web Push (VAPID keys from the environment)                                                            |                                                                                      |
+| `Throttle`        | `@softistx/redis`                                                                                     | fail closed for sign-in codes, open elsewhere                                        |
+| `Clock`           | system clock                                                                                          | passed to every job and rule                                                         |
 
 ## 4. The AI pipeline
 
@@ -310,14 +310,14 @@ See §6. `matchesFor(listingId)` for its author; `dismissMatch(matchId)`.
 
 Daily jobs (worker, `Clock` passed in, idempotent, logged):
 
-| Job | Rule |
-| --- | --- |
-| expiry | a listing expires 90 days after publication; a reminder 7 days before; `extendListing` adds 90 days |
-| ID unclaimed | a `FOUND` ID document unclaimed after 30 days is flagged: its finder (or org) is asked to hand it to the police or its issuer, with the nearest safe places |
-| ID photos | originals, blurred copies, `idFields` and selfies are deleted when a listing closes, expires or is removed |
-| org destruction | a register entry stored past its org's `destructionDelayDays` is proposed for destruction (never destroyed automatically) |
-| chats | a conversation's messages are deleted 90 days after its listing closes (kept longer only under an open report) |
-| codes | sign-in and handover codes expire (Redis TTL) |
+| Job             | Rule                                                                                                                                                        |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| expiry          | a listing expires 90 days after publication; a reminder 7 days before; `extendListing` adds 90 days                                                         |
+| ID unclaimed    | a `FOUND` ID document unclaimed after 30 days is flagged: its finder (or org) is asked to hand it to the police or its issuer, with the nearest safe places |
+| ID photos       | originals, blurred copies, `idFields` and selfies are deleted when a listing closes, expires or is removed                                                  |
+| org destruction | a register entry stored past its org's `destructionDelayDays` is proposed for destruction (never destroyed automatically)                                   |
+| chats           | a conversation's messages are deleted 90 days after its listing closes (kept longer only under an open report)                                              |
+| codes           | sign-in and handover codes expire (Redis TTL)                                                                                                               |
 
 ## 8. Security and anti-fraud
 
