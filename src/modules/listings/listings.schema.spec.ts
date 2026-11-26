@@ -28,14 +28,17 @@ describe("what a visitor reaches from a listing", () => {
     const type = schema.getType("PublicListing") as GraphQLObjectType;
     expect(Object.keys(type.getFields()).sort()).toEqual([
       "attributes",
+      "blurredPhotoKeys",
       "categoryKey",
       "countryCode",
       "date",
       "description",
       "documentType",
       "expiresAt",
+      "holderHint",
       "id",
       "kind",
+      "maskedNumber",
       "organisationSlug",
       "photoKeys",
       "place",
@@ -102,6 +105,19 @@ describe("what a visitor reaches from a listing", () => {
         .filter((name) => banned.test(name))
         .map((name) => `${type.name}.${name}`),
     );
+    expect(found).toEqual([]);
+  });
+
+  test("no type of the whole schema carries what the OCR read of an ID document", () => {
+    const banned =
+      /^(idFields|idNumberHash|idNumber|fullNumber|lastDigits|last4|surname|givenNames|holderName|birthDate|expiryDate|mrz)$/i;
+    const found = Object.values(schema.getTypeMap())
+      .filter((type) => isObjectType(type) && !type.name.startsWith("__"))
+      .flatMap((type) =>
+        Object.keys((type as GraphQLObjectType).getFields())
+          .filter((name) => banned.test(name))
+          .map((name) => `${type.name}.${name}`),
+      );
     expect(found).toEqual([]);
   });
 });

@@ -6,8 +6,11 @@ import type { AppMongo } from "../config/db";
 import type { Geocoder } from "../geocoder";
 import { services } from "../modules";
 import type { ListingRanker } from "../modules/search";
+import type { Ocr } from "../ocr";
+import type { ImageRedactor } from "../redactor";
 import type { Now } from "../shared/dates";
 import type { SmsSender } from "../sms";
+import type { IdVault } from "../vault";
 
 // What a request's context is built from: everything passed explicitly by
 // `createApp`, never defaulted here.
@@ -18,6 +21,9 @@ export interface ContextDeps {
   mailer: Mailer;
   geocoder: Geocoder;
   media: MediaBucket;
+  ocr: Ocr;
+  redactor: ImageRedactor;
+  vault: IdVault;
   ranker: ListingRanker;
   now: Now;
 }

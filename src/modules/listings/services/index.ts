@@ -1,4 +1,9 @@
 export type { ListingContent } from "../listings.utils";
+export {
+  type IdDocumentDeps,
+  IdDocumentsService,
+  type PhotoCheck,
+} from "./id-documents.service";
 export { ListingMedia } from "./listing-media.service";
 export {
   type DeclareInput,

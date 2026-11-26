@@ -1,6 +1,7 @@
 import { trustProxy } from "@softistx/alxia";
 import { defineEnv } from "@softistx/alxia-env";
 import { z } from "zod";
+import { isPrivateServiceUrl } from "@/ocr/private-url";
 
 // A range or an address trustProxy accepts: it throws on any other.
 const isRange = (range: string) => {
@@ -137,6 +138,30 @@ const parsed = defineEnv({
   GEOCODER_USER_AGENT: inProduction(
     z.string().min(10).max(200),
     "rouvix-api-development",
+  ),
+  // The local OCR, the Tesseract sidecar (docker/ocr): a service on this
+  // machine or its private network only, never one across the internet (an ID
+  // document's photo is what it reads). Required in production; unset
+  // elsewhere, every photo the OCR would check is treated as an ID document's
+  // (blurred in public, no number read).
+  OCR_URL: orUnset(
+    z
+      .string()
+      .refine(isPrivateServiceUrl, "not a private http(s) service URL")
+      .transform((url) => url.replace(/\/+$/, "")),
+  ),
+  // The key ID documents' OCR fields are sealed with, and their numbers
+  // hashed by: 32 random bytes in base64 (openssl rand -base64 32). Required
+  // in production; unset elsewhere, a key of this process (lost at restart).
+  ID_FIELDS_KEY: orUnset(
+    z
+      .string()
+      .refine(
+        (value) =>
+          /^[A-Za-z0-9+/]{43}=$/.test(value) &&
+          Buffer.from(value, "base64").length === 32,
+        "not 32 bytes in base64",
+      ),
   ),
 });
 

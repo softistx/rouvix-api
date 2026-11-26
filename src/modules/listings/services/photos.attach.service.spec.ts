@@ -35,7 +35,9 @@ describe("who may attach a photo", () => {
       declared.version,
       false,
     );
-    expect(edited.photos).toEqual([{ key, status: "PENDING" }]);
+    expect(edited.photos).toEqual([
+      { key, status: "PENDING", blurredKey: null },
+    ]);
     const stranger = await issuesOf(
       agent.listings.declare(
         agent.viewer,
@@ -122,11 +124,13 @@ describe("a photo added to an open listing", () => {
       declared.version,
       false,
     );
-    expect(updated.photos).toEqual([{ key, status: "PENDING" }]);
+    expect(updated.photos).toEqual([
+      { key, status: "PENDING", blurredKey: null },
+    ]);
     await kit.auth.background.settled();
     expect(await me.listings.find(declared._id.toHexString())).toMatchObject({
       status: "OPEN",
-      photos: [{ key, status: "READY" }],
+      photos: [{ key, status: "READY", blurredKey: null }],
     });
   });
 });

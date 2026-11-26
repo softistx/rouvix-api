@@ -1,6 +1,8 @@
+import { mediaObjectKey } from "@softistx/alxia-media";
 import { type GeoPoint, toGeoJson } from "@/modules/config";
 import { DAY_MS } from "@/shared/dates";
-import type { KeptAt, ListingStatus, PhotoStatus } from "./models";
+import { BLURRED_KIND, PHOTO_FULL, PHOTO_KIND } from "./listings.media";
+import type { KeptAt, ListingPhoto, ListingStatus } from "./models";
 
 // A listing lives 90 days, and an extension adds as many, up to three times.
 export const LISTING_DAYS = 90;
@@ -142,11 +144,11 @@ export interface ListingContent {
 }
 
 // What a listing's content is stored as: the fields of the stored document.
-// `known` holds the status of the photos the listing already carries; a new
-// key starts pending.
+// `known` holds the photos the listing already carries, as they were
+// processed; a new key starts pending, with no blurred copy.
 export function storedFields(
   content: ListingContent,
-  known: ReadonlyMap<string, PhotoStatus>,
+  known: ReadonlyMap<string, ListingPhoto>,
 ) {
   return {
     countryCode: content.countryCode,
@@ -159,10 +161,10 @@ export function storedFields(
       brand: content.attributes.brand ?? null,
       marks: content.attributes.marks ?? null,
     },
-    photos: content.photoKeys.map((key) => ({
-      key,
-      status: known.get(key) ?? ("PENDING" as const),
-    })),
+    photos: content.photoKeys.map(
+      (key): ListingPhoto =>
+        known.get(key) ?? { key, status: "PENDING", blurredKey: null },
+    ),
     place: {
       label: content.place.label,
       point: toGeoJson(content.place.point),
@@ -180,3 +182,54 @@ export function storedFields(
     questions: content.questions,
   };
 }
+
+// The blurred copies among photos, or among what the photo job made of them.
+export const blurredKeysOf = (
+  items: Iterable<{ blurredKey?: string | null | undefined }>,
+): string[] =>
+  [...items].flatMap((item) =>
+    typeof item.blurredKey === "string" ? [item.blurredKey] : [],
+  );
+
+// What the photo job may still settle: a listing being published or public.
+// Any other (closed, expired, removed) took its ID photos with it.
+export const SETTLING_STATUSES: readonly ListingStatus[] = [
+  "PENDING",
+  "OPEN",
+  "CLAIMED",
+];
+
+// The bucket object of a blurred copy.
+export const blurredObjectKey = (key: string) =>
+  mediaObjectKey(BLURRED_KIND, key);
+
+// The bucket objects (renditions) of the photos the job dropped.
+export const droppedKeysOf = (
+  checks: ReadonlyMap<string, { outcome: "DROPPED" | "READY" }>,
+): string[] =>
+  [...checks].flatMap(([key, check]) =>
+    check.outcome === "DROPPED"
+      ? [mediaObjectKey(PHOTO_KIND, key, PHOTO_FULL)]
+      : [],
+  );
+
+// The bucket objects of photos: each one's rendition and its blurred copy.
+export const objectKeysOf = (
+  photos: readonly Pick<ListingPhoto, "key" | "blurredKey">[],
+): string[] => [
+  ...photos.map((photo) => mediaObjectKey(PHOTO_KIND, photo.key, PHOTO_FULL)),
+  ...blurredKeysOf(photos).map(blurredObjectKey),
+];
+
+// Whether two lists of photos say the same, photo by photo.
+export const sameItems = (
+  a: readonly ListingPhoto[],
+  b: readonly ListingPhoto[],
+) =>
+  a.length === b.length &&
+  a.every(
+    (photo, i) =>
+      photo.key === b[i]?.key &&
+      photo.status === b[i]?.status &&
+      photo.blurredKey === b[i]?.blurredKey,
+  );

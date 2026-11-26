@@ -1,5 +1,5 @@
 import type { FieldIssue } from "@/shared/errors";
-import type { KeptAt, ListingKind } from "./models";
+import type { KeptAt, ListingKind } from "../models";
 
 export const MIN_RADIUS_M = 200;
 export const MAX_RADIUS_M = 20_000;

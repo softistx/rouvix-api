@@ -37,7 +37,8 @@ export class ListingMedia {
 
   // The answer to a read: the author and the organisation's agents read every
   // photo of the listing and their own uploads; anybody else reads a photo
-  // that is ready, of a public listing that is not a document's.
+  // that is ready, of a public listing that is not a document's, and that the
+  // OCR found nothing of an ID in (no blurred copy stands for it).
   async mayRead(key: string): Promise<boolean> {
     const { viewer, mongo } = this.options;
     if (viewer?.suspendedAt) return false;
@@ -52,8 +53,27 @@ export class ListingMedia {
     const photo = listing.photos.find((one) => one.key === key);
     return (
       photo?.status === "READY" &&
+      photo.blurredKey === null &&
       PUBLIC_STATUSES.includes(listing.status) &&
       listing.documentType === null
+    );
+  }
+
+  // The answer to a read of a blurred copy: the listing's editors, and anybody
+  // once the listing is public and the photo processed.
+  async mayReadBlurred(key: string): Promise<boolean> {
+    const { viewer, mongo } = this.options;
+    if (viewer?.suspendedAt) return false;
+    const listing = await mongo.db.listings.findFirst({
+      "photos.blurredKey": key,
+    });
+    if (listing === undefined) return false;
+    if (viewer !== null && (await editsOwned(this.options, viewer, listing))) {
+      return true;
+    }
+    const photo = listing.photos.find((one) => one.blurredKey === key);
+    return (
+      photo?.status === "READY" && PUBLIC_STATUSES.includes(listing.status)
     );
   }
 

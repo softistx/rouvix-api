@@ -4,8 +4,7 @@ import { ObjectId } from "mongodb";
 import { mongo } from "@/config/db";
 import { type AuthApp, authApp } from "~/auth";
 import { clearDatabase, resetConfig } from "~/db";
-import { listingsAs, lostContent, photoOf } from "~/listings";
-import { PhotosService } from "./photos.service";
+import { listingsAs, lostContent, photoOf, photosOver } from "~/listings";
 
 let kit: AuthApp;
 beforeEach(async () => {
@@ -37,7 +36,6 @@ function flaky(method: "open" | "delete", failures: number) {
   }) as MediaBucket;
   return { bucket, calls };
 }
-const noPause = async () => {};
 
 describe("a pending listing always opens", () => {
   test("an update that drops every photo of a pending listing opens it", async () => {
@@ -100,13 +98,11 @@ describe("the photo job", () => {
     );
     await mongo.db.listings.update(declared._id, { status: "PENDING" });
     const { bucket, calls } = flaky("open", 2);
-    await new PhotosService(mongo, bucket, noPause).settleWithRetry(
-      declared._id.toHexString(),
-    );
+    await photosOver(kit, bucket).settleWithRetry(declared._id.toHexString());
     expect(calls.count).toBe(3);
     expect(await me.listings.find(declared._id.toHexString())).toMatchObject({
       status: "OPEN",
-      photos: [{ key, status: "READY" }],
+      photos: [{ key, status: "READY", blurredKey: null }],
     });
   });
 
@@ -121,9 +117,7 @@ describe("the photo job", () => {
     await mongo.db.listings.update(declared._id, { status: "PENDING" });
     const { bucket } = flaky("open", 99);
     await expect(
-      new PhotosService(mongo, bucket, noPause).settleWithRetry(
-        declared._id.toHexString(),
-      ),
+      photosOver(kit, bucket).settleWithRetry(declared._id.toHexString()),
     ).rejects.toThrow("bucket down");
     expect((await me.listings.find(declared._id.toHexString()))?.status).toBe(
       "PENDING",
@@ -137,7 +131,7 @@ describe("the photo job", () => {
       { ...lostContent(), kind: "LOST" },
       null,
     );
-    const photos = new PhotosService(mongo, kit.storage.bucket, noPause);
+    const photos = photosOver(kit, kit.storage.bucket);
     await photos.settle(draft._id.toHexString());
     await photos.settle(new ObjectId().toHexString());
     expect((await me.listings.find(draft._id.toHexString()))?.status).toBe(
@@ -151,7 +145,7 @@ describe("discard", () => {
     const me = await listingsAs(kit);
     const key = await photoOf(kit, me.token);
     const { bucket, calls } = flaky("delete", 2);
-    await new PhotosService(mongo, bucket, noPause).discard([key]);
+    await photosOver(kit, bucket).discard([{ key, blurredKey: null }]);
     expect(calls.count).toBe(3);
     expect(kit.storage.objects.size).toBe(0);
     // The upload record stays: it is the hourly budget's ledger.
@@ -166,7 +160,7 @@ describe("discard", () => {
     const original = console.error;
     console.error = (...args: unknown[]) => logged.push(args);
     try {
-      await new PhotosService(mongo, bucket, noPause).discard([key]);
+      await photosOver(kit, bucket).discard([{ key, blurredKey: null }]);
     } finally {
       console.error = original;
     }

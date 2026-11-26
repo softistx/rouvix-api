@@ -4,17 +4,21 @@ import type { Viewer } from "@/auth/access";
 import type { Auth } from "@/auth/auth";
 import type { AppMongo } from "@/config/db";
 import type { Geocoder } from "@/geocoder";
+import type { Ocr } from "@/ocr";
+import type { ImageRedactor } from "@/redactor";
 import type { Background } from "@/shared/background";
 import type { Now } from "@/shared/dates";
 import type { SmsSender } from "@/sms";
+import type { IdVault } from "@/vault";
 import { AccountsService } from "./accounts";
+import { RemotePhotoGuard } from "./ai";
 import {
   CategoriesService,
   CountriesService,
   GeocodingService,
   SafePlacesService,
 } from "./config";
-import { ListingsService, PhotosService } from "./listings";
+import { IdDocumentsService, ListingsService, PhotosService } from "./listings";
 import {
   MembersService,
   OrganisationRelations,
@@ -35,6 +39,11 @@ export interface ServiceDeps {
   geocoder: Geocoder;
   // The private bucket the photos live in, and where the photo job runs from.
   media: MediaBucket;
+  // The ID document pipeline's three, local all (spec §4.2): the OCR sidecar,
+  // the in-process blur and the vault of the ID fields.
+  ocr: Ocr;
+  redactor: ImageRedactor;
+  vault: IdVault;
   background: Pick<Background, "run">;
   // How a text search puts its matches in order, passed explicitly.
   ranker: ListingRanker;
@@ -48,17 +57,38 @@ export function services(deps: ServiceDeps & { viewer: Viewer | null }) {
   const relations = new OrganisationRelations(rest.auth);
   const countries = new CountriesService(mongo);
   const categories = new CategoriesService(mongo);
-  const photos = new PhotosService(mongo, rest.media);
+  const pause = (ms: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+  const documents = new IdDocumentsService({
+    bucket: rest.media,
+    ocr: rest.ocr,
+    redactor: rest.redactor,
+    vault: rest.vault,
+    countries,
+    now: rest.now,
+    pause,
+  });
+  const photos = new PhotosService(mongo, rest.media, documents, pause);
+  const listings = new ListingsService(mongo, {
+    countries,
+    categories,
+    photos,
+    now: rest.now,
+    background: rest.background,
+  });
   return {
     countries,
     categories,
     photos,
-    listings: new ListingsService(mongo, {
-      countries,
+    listings,
+    // The gate of every call that would send a photo off the VPS (the object
+    // describer's, a later slice): an ID document's never passes.
+    remotePhotos: new RemotePhotoGuard({
+      ocr: rest.ocr,
       categories,
-      photos,
+      countries,
+      idPhoto: (key) => listings.isIdPhoto(key),
       now: rest.now,
-      background: rest.background,
     }),
     search: new SearchService(mongo, { now: rest.now, ranker: rest.ranker }),
     map: new MapService(mongo, { now: rest.now }),

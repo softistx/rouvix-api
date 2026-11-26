@@ -1,8 +1,15 @@
+import type { MediaBucket } from "@softistx/alxia-media";
 import { viewerOf } from "@/auth/access";
 import { mongo } from "@/config/db";
 import { services } from "@/modules";
-import type { ListingContent } from "@/modules/listings/services";
+import { CountriesService } from "@/modules/config";
+import {
+  IdDocumentsService,
+  type ListingContent,
+  PhotosService,
+} from "@/modules/listings/services";
 import { textRanker } from "@/modules/search";
+import type { ImageRedactor } from "@/redactor";
 import type { AuthApp } from "~/auth";
 import { fakeE164, signedIn, uploadPhoto } from "~/fixtures";
 import { jpegOf } from "~/images";
@@ -20,6 +27,9 @@ export async function listingsAs(kit: AuthApp, n = 1) {
     mailer: kit.mailer,
     geocoder: kit.geocoder,
     media: kit.storage.bucket,
+    ocr: kit.ocr,
+    redactor: kit.redactor,
+    vault: kit.vault,
     ranker: textRanker,
     background: kit.auth.background,
     viewer,
@@ -60,6 +70,19 @@ export const lostContent = (
   ...over,
 });
 
+// A found CNI kept with its finder, drawn photos aside: what a finder declares
+// of an ID document. `over` replaces fields.
+export const documentContent = (
+  over: Partial<ListingContent> = {},
+): ListingContent =>
+  foundContent({
+    categoryKey: "DOCUMENT",
+    documentType: "CNI",
+    title: "CNI trouvée",
+    description: "Trouvée près de la gare",
+    ...over,
+  });
+
 // A found wallet kept with its finder: one question, its answer expected.
 export const foundContent = (
   over: Partial<ListingContent> = {},
@@ -79,3 +102,26 @@ export const foundContent = (
   questions: [{ prompt: "Quelle initiale est brodée ?", answer: "Z" }],
   ...over,
 });
+
+export const noPause = async () => {};
+
+// The ID document pipeline over `bucket` and the kit's OCR, vault and blur (or
+// `redactor`), with no pause between its retries.
+export const idDocumentsOver = (
+  kit: AuthApp,
+  bucket: MediaBucket,
+  redactor: ImageRedactor = kit.redactor,
+) =>
+  new IdDocumentsService({
+    bucket,
+    ocr: kit.ocr,
+    redactor,
+    vault: kit.vault,
+    countries: new CountriesService(mongo),
+    now: () => new Date(kit.clock.now()),
+    pause: noPause,
+  });
+
+// The photo job over `bucket` (a flaky one, say), with no pause.
+export const photosOver = (kit: AuthApp, bucket: MediaBucket) =>
+  new PhotosService(mongo, bucket, idDocumentsOver(kit, bucket), noPause);

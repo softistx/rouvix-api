@@ -1,63 +1,77 @@
-import { type MediaBucket, mediaObjectKey } from "@softistx/alxia-media";
+import type { MediaBucket } from "@softistx/alxia-media";
 import type { AppMongo } from "@/config/db";
 import { locked } from "../listings.errors";
-import { PHOTO_FULL, PHOTO_KIND } from "../listings.media";
+import {
+  blurredKeysOf,
+  blurredObjectKey,
+  droppedKeysOf,
+  objectKeysOf,
+  SETTLING_STATUSES,
+  sameItems,
+} from "../listings.utils";
+import type { ListingPhoto } from "../models";
+import type { IdDocumentsService } from "./id-documents.service";
 
 const TIMEOUT_MS = 10_000;
 
-// What the module does with the photo objects of its listings: finds out
-// whether a photo is stored, and removes it. The media routes store the bytes
-// (src/http/media.ts); the bucket is the private one, passed explicitly.
+// What the module does with the photo objects of its listings: settles a
+// published listing's photos through the ID document pipeline, and removes
+// objects. The media routes store the uploads (src/http/media.ts); the bucket
+// is the private one, passed explicitly.
 export class PhotosService {
   constructor(
     private readonly mongo: AppMongo,
     private readonly bucket: MediaBucket,
+    private readonly documents: IdDocumentsService,
     private readonly pause: (ms: number) => Promise<void> = (ms) =>
       new Promise((resolve) => setTimeout(resolve, ms)),
   ) {}
 
-  // Whether the photo's rendition is in the bucket.
-  async stored(key: string): Promise<boolean> {
-    const opened = await this.bucket.open(
-      { key: mediaObjectKey(PHOTO_KIND, key, PHOTO_FULL) },
-      { timeoutMs: TIMEOUT_MS },
-    );
-    if (opened === undefined) return false;
-    await opened.stream.cancel();
-    return true;
-  }
-
-  // Settles a listing's photos, as the background job after a publish does: a
-  // pending photo whose rendition is stored is READY, one that is not is
-  // dropped, and a pending listing with no pending photo left opens. An ID
-  // document's photos stay pending, held back for the OCR and blur of a later
-  // slice (never served meanwhile).
+  // Settles a listing's photos, as the background job after a publish does:
+  // each pending photo goes through the ID document pipeline (read by the
+  // local OCR, blurred when it is an ID's), a photo whose rendition is not
+  // stored is dropped, and a pending listing with no pending photo left
+  // opens. The pipeline runs once, before the write; the write is locked on
+  // what it reads again, so a change in between (a removal, a close) is kept,
+  // and the blurred copies it made of photos dropped meanwhile are removed.
   async settle(listingId: string): Promise<void> {
-    await locked(false, async () => {
+    const first = await this.mongo.db.listings.findById(listingId);
+    if (first === undefined || first.status === "DRAFT") return;
+    const checks = await this.documents.check(first);
+    const leftovers = await locked(false, async () => {
       const listing = await this.mongo.db.listings.findById(listingId);
-      if (listing === undefined || listing.status === "DRAFT") return;
-      if (listing.documentType !== null && listing.photos.length > 0) return;
-      const settled = await Promise.all(
-        listing.photos.map(async (photo) =>
-          photo.status === "READY" || (await this.stored(photo.key))
-            ? { key: photo.key, status: "READY" as const }
-            : undefined,
-        ),
+      // Gone, closed (its ID photos went with it), or its document type
+      // changed meanwhile (its photos were reset, and that update's own job
+      // checks them again): nothing applies, what the checks made is removed.
+      if (
+        listing === undefined ||
+        !SETTLING_STATUSES.includes(listing.status) ||
+        listing.documentType !== first.documentType
+      ) {
+        return [
+          ...blurredKeysOf(checks.values()).map(blurredObjectKey),
+          ...droppedKeysOf(checks),
+        ];
+      }
+      const { orphans, dropped, ...fields } = this.documents.settled(
+        listing,
+        checks,
       );
-      const photos = settled.filter((photo) => photo !== undefined);
-      const opens = listing.status === "PENDING";
-      const same =
-        photos.length === listing.photos.length &&
-        listing.photos.every((photo) => photo.status === "READY");
-      if (!opens && same) return;
+      const left = [...orphans.map(blurredObjectKey), ...dropped];
+      const opens =
+        listing.status === "PENDING" &&
+        fields.photos.every((photo) => photo.status === "READY");
+      if (!opens && sameItems(fields.photos, listing.photos)) return left;
       await this.mongo.db.listings.update(listing._id, {
-        photos,
+        ...fields,
         ...(opens && { status: "OPEN" as const }),
         // Locked on what was read: a write that came in between (a removal, a
         // close) makes this one read again instead of overwriting it.
         version: listing.version,
       });
+      return left;
     });
+    await this.discardObjects(leftovers);
   }
 
   // The job as the write starts it: a bucket that does not answer is tried
@@ -74,23 +88,30 @@ export class PhotosService {
     }
   }
 
-  // Removes the stored renditions of `keys` (their upload records stay: they
-  // are the account's upload ledger for the hourly budget), trying
-  // each key three times. A key that still fails is logged and left behind:
-  // the listing's own write has committed, and an orphan sweep (a later
-  // slice) takes what remains.
-  async discard(keys: readonly string[]): Promise<void> {
-    for (const key of keys) {
+  // Removes the stored rendition of each photo and its blurred copy, if any
+  // (their upload records stay: they are the account's upload ledger for the
+  // hourly budget).
+  async discard(photos: readonly Pick<ListingPhoto, "key" | "blurredKey">[]) {
+    await this.discardObjects(objectKeysOf(photos));
+  }
+
+  // Removes the blurred copies alone: photos whose ID processing starts over.
+  async discardBlurred(photos: readonly Pick<ListingPhoto, "blurredKey">[]) {
+    await this.discardObjects(blurredKeysOf(photos).map(blurredObjectKey));
+  }
+
+  // Each object tried three times. One that still fails is logged and left
+  // behind: the listing's own write has committed, and an orphan sweep (a
+  // later slice) takes what remains.
+  private async discardObjects(objectKeys: readonly string[]) {
+    for (const key of objectKeys) {
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
-          await this.bucket.delete(
-            { key: mediaObjectKey(PHOTO_KIND, key, PHOTO_FULL) },
-            { timeoutMs: TIMEOUT_MS },
-          );
+          await this.bucket.delete({ key }, { timeoutMs: TIMEOUT_MS });
           break;
         } catch (error) {
           if (attempt === 3) {
-            console.error(`rouvix-api: photo ${key} not removed:`, error);
+            console.error(`rouvix-api: object ${key} not removed:`, error);
           } else await this.pause(attempt * 200);
         }
       }

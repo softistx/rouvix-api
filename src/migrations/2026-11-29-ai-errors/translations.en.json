@@ -1,0 +1,4 @@
+{
+  "ai.errors.document-photo": "This photo looks like an ID document: it stays on our servers. Choose the Documents category to declare it.",
+  "ai.errors.unavailable": "The photo check is unavailable right now: go on without a suggestion."
+}

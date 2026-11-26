@@ -97,4 +97,25 @@ describe("env", () => {
     await expect(parsed({ REDIS_URL: "nope" })).rejects.toThrow();
     await expect(parsed({ TRUSTED_PROXIES: "not-a-range" })).rejects.toThrow();
   });
+
+  test("the OCR is a private service only, never one across the internet", async () => {
+    const local = await parsed({ OCR_URL: "http://rouvix-ocr:8884/" });
+    expect(local.env.OCR_URL).toBe("http://rouvix-ocr:8884");
+    const none = await parsed({ OCR_URL: undefined });
+    expect(none.env.OCR_URL).toBeUndefined();
+    for (const url of ["https://ocr.example.com", "http://8.8.8.8:8884"]) {
+      await expect(parsed({ OCR_URL: url })).rejects.toThrow();
+    }
+  });
+
+  test("the ID fields key is 32 bytes in base64, or unset outside production", async () => {
+    const key = Buffer.alloc(32, 7).toString("base64");
+    expect((await parsed({ ID_FIELDS_KEY: key })).env.ID_FIELDS_KEY).toBe(key);
+    expect(
+      (await parsed({ ID_FIELDS_KEY: undefined })).env.ID_FIELDS_KEY,
+    ).toBeUndefined();
+    await expect(
+      parsed({ ID_FIELDS_KEY: Buffer.alloc(16).toString("base64") }),
+    ).rejects.toThrow();
+  });
 });

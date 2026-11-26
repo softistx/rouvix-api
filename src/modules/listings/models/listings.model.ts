@@ -27,6 +27,26 @@ export type KeptAt = z.infer<typeof keptAt>;
 export const photoStatus = z.enum(["PENDING", "READY"]);
 export type PhotoStatus = z.infer<typeof photoStatus>;
 
+// A photo of a listing. `key` is its private rendition (EXIF stripped, 1600
+// px), the original as far as anybody may see one; `blurredKey` the strongly
+// blurred copy the public sees instead, set for an ID document's photo and for
+// any photo the local OCR found ID-like (spec §4.2): such a photo's own key is
+// served to its listing's editors only.
+export const listingPhoto = z.object({
+  key: z.uuid(),
+  status: photoStatus,
+  blurredKey: z.uuid().nullable().default(null),
+});
+export type ListingPhoto = z.infer<typeof listingPhoto>;
+
+// What a visitor reads of an ID document (spec §4.2): its number with all but
+// its first two characters masked, and the holder's first name with their
+// last name's initial. Null when the OCR read none.
+export const publicIdText = z.object({
+  maskedNumber: z.string().max(40).nullable().default(null),
+  holderHint: z.string().max(60).nullable().default(null),
+});
+
 // A listing, the declaration of a lost or a found item (spec §5.3). Platform
 // data, not tenant data: `orgId` says the listing belongs to an organisation's
 // register (its agents edit it), it is not a tenant field. `place.point` is the
@@ -55,7 +75,7 @@ export const listings = defineCollection({
       brand: z.string().trim().min(1).max(60).nullable().default(null),
       marks: z.string().trim().min(1).max(300).nullable().default(null),
     }),
-    photos: z.array(z.object({ key: z.uuid(), status: photoStatus })).max(5),
+    photos: z.array(listingPhoto).max(5),
     place: z.object({
       label: z.string().trim().min(1).max(160),
       point: z.object({
@@ -99,6 +119,18 @@ export const listings = defineCollection({
     publishedAt: z.date().nullable().default(null),
     expiresAt: z.date().nullable().default(null),
     extendedCount: z.number().int().min(0).default(0),
+    // An ID document's fields as the local OCR read them (number, names,
+    // dates), sealed by the IdVault (src/vault): never in the schema, never
+    // returned. `idNumberHash` is the keyed hash of the normalised number,
+    // which matching compares. All three are cleared, with the photos, when
+    // the listing closes or is removed.
+    idFields: z.string().max(4000).nullable().default(null),
+    idNumberHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .nullable()
+      .default(null),
+    public: publicIdText.default({ maskedNumber: null, holderHint: null }),
   }),
   timestamps: true,
   optimisticLock: true,
@@ -114,6 +146,18 @@ export const listings = defineCollection({
       sparse: true,
     },
     { key: { orgId: 1, status: 1 }, name: "listings_org" },
+    // Matching (spec §6): an ID document's number, compared as its hash.
+    {
+      key: { idNumberHash: 1 },
+      name: "listings_id_number",
+      partialFilterExpression: { idNumberHash: { $type: "string" } },
+    },
+    // The blurred copies, which the media route looks a key up by.
+    {
+      key: { "photos.blurredKey": 1 },
+      name: "listings_blurred_key",
+      partialFilterExpression: { "photos.blurredKey": { $type: "string" } },
+    },
     // Search (spec §5.4): the words, french and english alike (no stemming,
     // accents and case folded), the point, and the filters in their usual order.
     {
