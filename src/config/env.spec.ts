@@ -31,6 +31,15 @@ describe("env", () => {
     expect(env.AT_BASE_URL).toBe("https://api.africastalking.com");
   });
 
+  test("the geocoder defaults to the public Nominatim and a development User-Agent", async () => {
+    const { env } = await parsed({
+      GEOCODER_URL: "https://nominatim.example.test/",
+      GEOCODER_USER_AGENT: undefined,
+    });
+    expect(env.GEOCODER_URL).toBe("https://nominatim.example.test");
+    expect(env.GEOCODER_USER_AGENT).toBe("rouvix-api-development");
+  });
+
   test("Africa's Talking needs its username and key", async () => {
     await expect(
       parsed({

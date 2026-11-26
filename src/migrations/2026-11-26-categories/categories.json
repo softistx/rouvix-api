@@ -1,0 +1,125 @@
+[
+  {
+    "_id": "DOCUMENT",
+    "labels": { "fr": "Documents", "en": "Documents" },
+    "parent": null,
+    "isDocument": true,
+    "order": 0,
+    "active": true
+  },
+  {
+    "_id": "CNI",
+    "labels": { "fr": "Carte nationale d'identité", "en": "National ID card" },
+    "parent": "DOCUMENT",
+    "isDocument": true,
+    "order": 0,
+    "active": true
+  },
+  {
+    "_id": "RECEPISSE_CNI",
+    "labels": { "fr": "Récépissé de CNI", "en": "ID card receipt" },
+    "parent": "DOCUMENT",
+    "isDocument": true,
+    "order": 1,
+    "active": true
+  },
+  {
+    "_id": "PASSPORT",
+    "labels": { "fr": "Passeport", "en": "Passport" },
+    "parent": "DOCUMENT",
+    "isDocument": true,
+    "order": 2,
+    "active": true
+  },
+  {
+    "_id": "DRIVING_LICENCE",
+    "labels": { "fr": "Permis de conduire", "en": "Driving licence" },
+    "parent": "DOCUMENT",
+    "isDocument": true,
+    "order": 3,
+    "active": true
+  },
+  {
+    "_id": "STUDENT_CARD",
+    "labels": { "fr": "Carte d'étudiant", "en": "Student card" },
+    "parent": "DOCUMENT",
+    "isDocument": true,
+    "order": 4,
+    "active": true
+  },
+  {
+    "_id": "OTHER_CARD",
+    "labels": {
+      "fr": "Autre carte ou document",
+      "en": "Other card or document"
+    },
+    "parent": "DOCUMENT",
+    "isDocument": true,
+    "order": 5,
+    "active": true
+  },
+  {
+    "_id": "PHONE",
+    "labels": { "fr": "Téléphones", "en": "Phones" },
+    "parent": null,
+    "isDocument": false,
+    "order": 1,
+    "active": true
+  },
+  {
+    "_id": "WALLET_BAG",
+    "labels": { "fr": "Portefeuilles et sacs", "en": "Wallets and bags" },
+    "parent": null,
+    "isDocument": false,
+    "order": 2,
+    "active": true
+  },
+  {
+    "_id": "KEYS",
+    "labels": { "fr": "Clés", "en": "Keys" },
+    "parent": null,
+    "isDocument": false,
+    "order": 3,
+    "active": true
+  },
+  {
+    "_id": "ELECTRONICS",
+    "labels": { "fr": "Électronique", "en": "Electronics" },
+    "parent": null,
+    "isDocument": false,
+    "order": 4,
+    "active": true
+  },
+  {
+    "_id": "JEWELLERY",
+    "labels": { "fr": "Bijoux", "en": "Jewellery" },
+    "parent": null,
+    "isDocument": false,
+    "order": 5,
+    "active": true
+  },
+  {
+    "_id": "CLOTHING",
+    "labels": { "fr": "Vêtements", "en": "Clothing" },
+    "parent": null,
+    "isDocument": false,
+    "order": 6,
+    "active": true
+  },
+  {
+    "_id": "PET",
+    "labels": { "fr": "Animaux", "en": "Pets" },
+    "parent": null,
+    "isDocument": false,
+    "order": 7,
+    "active": true
+  },
+  {
+    "_id": "OTHER",
+    "labels": { "fr": "Autre", "en": "Other" },
+    "parent": null,
+    "isDocument": false,
+    "order": 8,
+    "active": true
+  }
+]

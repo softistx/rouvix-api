@@ -1,0 +1,26 @@
+[
+  {
+    "_id": "CM",
+    "names": { "fr": "Cameroun", "en": "Cameroon" },
+    "dialCode": "+237",
+    "phonePattern": "^\\+237[26]\\d{8}$",
+    "documentTypes": [
+      "CNI",
+      "RECEPISSE_CNI",
+      "PASSPORT",
+      "DRIVING_LICENCE",
+      "STUDENT_CARD",
+      "OTHER_CARD"
+    ],
+    "languages": ["FR", "EN"],
+    "mapCenter": { "latitude": 5.0, "longitude": 11.5 },
+    "mapZoom": 6,
+    "idNumberPatterns": [
+      { "documentType": "CNI", "pattern": "^\\d{8,10}$" },
+      { "documentType": "PASSPORT", "pattern": "^[A-Z]{2}\\d{7}$" },
+      { "documentType": "DRIVING_LICENCE", "pattern": "^[A-Z0-9/-]{6,20}$" },
+      { "documentType": "STUDENT_CARD", "pattern": "^[A-Z0-9/-]{4,20}$" }
+    ],
+    "active": true
+  }
+]

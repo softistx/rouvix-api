@@ -34,6 +34,10 @@ const config: CodegenConfig = {
           // An organisation and a member, from their documents.
           Organisation: "@/modules/organisations#OrganisationDocument",
           Member: "@/modules/organisations#MemberDocument",
+          // The config module's documents.
+          Country: "@/modules/config#CountryDocument",
+          Category: "@/modules/config#CategoryDocument",
+          SafePlace: "@/modules/config#SafePlaceDocument",
           // The error catalogue of a language: its version, the messages read
           // when selected; a message as the catalogue holds it.
           ErrorCatalogue: "@/modules/translations#CatalogueView",

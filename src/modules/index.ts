@@ -1,8 +1,14 @@
 import { accounts } from "./accounts";
+import { config } from "./config";
 import { organisations } from "./organisations";
 import { translationResolvers } from "./translations";
 
 // The registry: every module's resolvers, merged by graxia per type and field.
-export const resolvers = [accounts, organisations, translationResolvers];
+export const resolvers = [
+  accounts,
+  config,
+  organisations,
+  translationResolvers,
+];
 
 export { type ServiceDeps, type Services, services } from "./services";

@@ -1,0 +1,22 @@
+[
+  {
+    "_id": "6740a0000000000000000001",
+    "countryCode": "CM",
+    "city": "Douala",
+    "name": "Commissariat central de Douala",
+    "kind": "POLICE",
+    "location": { "type": "Point", "coordinates": [9.7043, 4.0511] },
+    "hours": null,
+    "orgId": null
+  },
+  {
+    "_id": "6740a0000000000000000002",
+    "countryCode": "CM",
+    "city": "Yaoundé",
+    "name": "Commissariat central de Yaoundé",
+    "kind": "POLICE",
+    "location": { "type": "Point", "coordinates": [11.5021, 3.848] },
+    "hours": null,
+    "orgId": null
+  }
+]

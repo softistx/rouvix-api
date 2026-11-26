@@ -1,0 +1,8 @@
+{
+  "config.errors.country-not-found": "Le pays « {code} » est inconnu ou inactif.",
+  "config.errors.document-type-unknown": "Le type de document « {key} » n'est pas une catégorie de document active.",
+  "config.errors.category-parent-invalid": "Le parent « {parent} » ne convient pas\u00a0: {reason, select, self {une catégorie ne peut pas être son propre parent} unknown {il n'existe pas} notroot {ce n'est pas une catégorie racine} haschildren {cette catégorie a des sous-catégories} other {document et non-document ne se mélangent pas}}.",
+  "config.errors.safe-place-not-found": "Ce lieu de remise est introuvable.",
+  "config.errors.geocoding-unavailable": "La recherche de lieux est momentanément indisponible. Réessayez dans un instant.",
+  "config.errors.stale-version": "Ce lieu a changé en même temps. Rechargez-le et réessayez."
+}

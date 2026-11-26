@@ -3,6 +3,10 @@ import { accountsErrors } from "./2026-11-25-accounts-errors.migration";
 import { initialCatalogues } from "./2026-11-25-initial-catalogues.migration";
 import { organisationsErrors } from "./2026-11-25-organisations-errors.migration";
 import { slugReserved } from "./2026-11-25-slug-reserved.migration";
+import { categoriesSeed } from "./2026-11-26-categories.migration";
+import { configErrors } from "./2026-11-26-config-errors.migration";
+import { countriesSeed } from "./2026-11-26-countries.migration";
+import { safePlacesSeed } from "./2026-11-26-safe-places.migration";
 
 // The migrations `bun run db:migrate` applies, in EXECUTION order: the only
 // thing `migrate`, `rollback` and the boot check read. A new migration is
@@ -16,4 +20,8 @@ export const migrations: readonly Migration[] = [
   accountsErrors,
   organisationsErrors,
   slugReserved,
+  categoriesSeed,
+  countriesSeed,
+  safePlacesSeed,
+  configErrors,
 ];

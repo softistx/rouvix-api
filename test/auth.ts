@@ -5,6 +5,7 @@ import { createApp } from "@/app";
 import { createAuth } from "@/auth/auth";
 import { mongo } from "@/config/db";
 import { clientHeader } from "@/http/csrf";
+import { fakeGeocoder } from "~/geocoder";
 import { memorySmsSender } from "~/sms";
 
 // The app with the REAL janus, its stores in the test database: a memory
@@ -15,6 +16,7 @@ export function authApp() {
   const clock = fixedClock(Date.now());
   const mailer = createMemoryMailer();
   const sms = memorySmsSender();
+  const geocoder = fakeGeocoder();
   const auth = createAuth({
     db: mongo.db,
     clock,
@@ -24,6 +26,7 @@ export function authApp() {
     auth,
     sms,
     mailer,
+    geocoder,
     now: () => new Date(clock.now()),
   });
   // A client sending the session `token` as a bearer, and `language` as
@@ -37,7 +40,7 @@ export function authApp() {
         ...(language && { "accept-language": language }),
       },
     });
-  return { auth, app, mailer, sms, clock, client };
+  return { auth, app, mailer, sms, geocoder, clock, client };
 }
 
 export type AuthApp = ReturnType<typeof authApp>;

@@ -111,6 +111,18 @@ const parsed = defineEnv({
     .url()
     .default("https://api.africastalking.com")
     .transform((url) => url.replace(/\/+$/, "")),
+  // The geocoding provider (OpenStreetMap's Nominatim): its base URL, and the
+  // User-Agent its usage policy requires, which names the application and a
+  // contact (set in deploy/.env, never in this public repository). Required in
+  // production.
+  GEOCODER_URL: z
+    .url()
+    .default("https://nominatim.openstreetmap.org")
+    .transform((url) => url.replace(/\/+$/, "")),
+  GEOCODER_USER_AGENT: inProduction(
+    z.string().min(10).max(200),
+    "rouvix-api-development",
+  ),
 });
 
 if (parsed.SMS_PROVIDER === "africastalking") {

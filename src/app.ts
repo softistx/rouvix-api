@@ -6,8 +6,10 @@ import type { Auth } from "./auth/auth";
 import { serverAuth } from "./config/auth";
 import { mongo } from "./config/db";
 import { env } from "./config/env";
+import { serverGeocoder } from "./config/geocoder";
 import { redis } from "./config/redis";
 import { serverSms } from "./config/sms";
+import type { Geocoder } from "./geocoder";
 import { type BaseOptions, createBase } from "./http/context";
 import { graphqlOptions, type ReportUnexpected } from "./http/graphql-endpoint";
 import { noStoreMiddleware } from "./http/no-store";
@@ -20,6 +22,7 @@ import { organisationDirectory } from "./tenancy";
 export type AppOptions = Partial<Omit<BaseOptions, "trusted">> & {
   auth?: Auth;
   sms?: SmsSender;
+  geocoder?: Geocoder;
   mailer?: Mailer;
   catalogues?: () => boolean;
   now?: Now;
@@ -33,6 +36,7 @@ export type AppOptions = Partial<Omit<BaseOptions, "trusted">> & {
 export function createApp(options: AppOptions = {}) {
   const auth = options.auth ?? serverAuth();
   const sms = options.sms ?? serverSms();
+  const geocoder = options.geocoder ?? serverGeocoder();
   const mailer = options.mailer ?? serverMailer(env.MAIL_URL);
   const cataloguesReady = options.catalogues ?? cataloguesLoaded;
   const now = options.now ?? (() => new Date());
@@ -48,7 +52,10 @@ export function createApp(options: AppOptions = {}) {
     .plugin((app) =>
       graphql(
         app,
-        graphqlOptions({ mongo, auth, sms, mailer, now }, options.onUnexpected),
+        graphqlOptions(
+          { mongo, auth, sms, mailer, geocoder, now },
+          options.onUnexpected,
+        ),
       ),
     )
     .onStop(async () => {

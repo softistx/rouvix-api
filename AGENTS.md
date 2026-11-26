@@ -88,3 +88,23 @@ refused in production). A spec passes `memorySmsSender` (`test/sms.ts`) and the 
 `bun run verify` is the green bar: `generate`, `schema:print --check` (commit `schema.graphql`
 after any `.graphqls` change), `biome ci`, `bun check`, `bun test`. A GraphQL document in a spec
 is held in a SCREAMING_SNAKE_CASE constant. Assert `extensions.code`, never the message.
+
+## Configuration data and geocoding
+
+- `countries`, `categories` and `safePlaces` (`src/modules/config`) are global platform data: no
+  `organisationId`, seeded by migrations (`kit/seed-documents.ts` inserts what is missing by `_id` and
+  never overwrites what the platform admin edited; its `down` deletes the ids it seeded), read by
+  every request and written by the platform admin (`requirePlatformAdmin`) through `setCountry`,
+  `setCategory` and the safe-place mutations. Reads are public; `includeInactive` and every write
+  are the admin's. A spec that writes them calls `resetConfig()` (`test/db.ts`).
+- The categories are a tree of two levels: `DOCUMENT` (`isDocument`) with the document types under
+  it (`CNI`, `PASSPORT`…), then the other roots. A country's `documentTypes` are keys of live
+  document categories.
+- Geocoding goes through the `Geocoder` port (`src/geocoder`): the Nominatim adapter keeps one
+  request a second (a queue, in this process), sends the application's own User-Agent
+  (`GEOCODER_USER_AGENT`, a contact in `deploy/.env`, never in this repository) and caches every
+  answer (Redis, memory without it). `geocode` and `reverseGeocode` need a signed-in account. A spec
+  uses `test/geocoder.ts` and never reaches a provider; a provider that fails is the 503
+  `config.errors.geocoding-unavailable`.
+- The seeded police stations are one central station per city at the city's centre: names and
+  points are approximate and the platform admin completes them. No real person's data is seeded.
