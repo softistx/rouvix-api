@@ -48,8 +48,8 @@ export interface GeocodeCache {
   set(key: string, entry: GeocodeCacheEntry): Promise<void>;
 }
 
-// A search answers a list, a reverse a place or none: `null` is kept too, so
-// a point with no place is not asked again.
+// A search answers a list, a reverse a list of one place or of none: an empty
+// list is kept too, so a point with no place is not asked again.
 export type GeocodeCacheEntry = { results: GeocodeResult[] };
 
 export function memoryGeocodeCache(): GeocodeCache & { size: () => number } {

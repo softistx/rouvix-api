@@ -11,8 +11,11 @@ export class GeocodingService {
     query: string,
     options: { countryCode?: string | null | undefined; limit: number },
   ) {
+    // A query of spaces asks nothing: no provider call, no result.
+    const text = query.trim();
+    if (text === "") return Promise.resolve([]);
     return this.guarded(() =>
-      this.geocoder.search(query.trim(), {
+      this.geocoder.search(text, {
         countryCode: options.countryCode ?? undefined,
         limit: options.limit,
       }),

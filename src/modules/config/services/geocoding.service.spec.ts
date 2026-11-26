@@ -20,6 +20,14 @@ describe("GeocodingService", () => {
     ).toEqual([]);
   });
 
+  test("a query of spaces asks the provider nothing", async () => {
+    const geocoder = fakeGeocoder();
+    expect(
+      await new GeocodingService(geocoder).search("   ", { limit: 3 }),
+    ).toEqual([]);
+    expect(geocoder.asked).toEqual([]);
+  });
+
   test("reads the place at a point", async () => {
     const found = await new GeocodingService(fakeGeocoder()).reverse({
       latitude: 4.05,
