@@ -1,0 +1,9 @@
+{
+  "listings.errors.listing-not-found": "Cette annonce est introuvable.",
+  "listings.errors.category-invalid": "La catégorie « {key} » est inconnue ou inactive.",
+  "listings.errors.document-type-invalid": "Le type de document {reason, select, required {est obligatoire pour une catégorie de documents} unexpected {n'a de sens que pour une catégorie de documents} other {n'est pas proposé dans ce pays}}.",
+  "listings.errors.photo-invalid": "{reason, select, duplicate {Cette photo est déjà dans l'annonce.} other {Cette photo est inconnue, ou déjà utilisée par une autre annonce.}}",
+  "listings.errors.invalid-status": "Cette annonce ne peut plus être modifiée\u00a0: elle est {status, select, DRAFT {en brouillon} PENDING {en attente de ses photos} OPEN {publiée} CLAIMED {réclamée} CLOSED {clôturée} EXPIRED {expirée} other {supprimée}}.",
+  "listings.errors.extension-limit": "Cette annonce a déjà été prolongée {limit, plural, one {# fois} other {# fois}}, le maximum.",
+  "listings.errors.stale-version": "L'annonce a changé en même temps. Rechargez-la et réessayez."
+}

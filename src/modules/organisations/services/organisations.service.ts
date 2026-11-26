@@ -29,6 +29,11 @@ export class OrganisationsService {
     private readonly relations: OrganisationRelations,
   ) {}
 
+  // The slug of the organisation `id` names, or null when it is gone.
+  async slugOf(id: ObjectId) {
+    return (await this.mongo.db.organisations.findById(id))?.slug ?? null;
+  }
+
   bySlug(slug: string) {
     return this.mongo.db.organisations.findFirst({ slug });
   }

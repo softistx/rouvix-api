@@ -29,3 +29,31 @@ export async function signedIn(
   if (session.status !== "signedIn") throw new Error("expected a session");
   return { account, token: session.token, phone };
 }
+
+// An account that uploaded a drawn photo to `/media/listing-photos`, as a
+// browser does through its BFF: the raw body with its length, a bearer token and
+// the client header. Returns the media key. The picture is a generated gradient,
+// never a real photo.
+export async function uploadPhoto(
+  kit: AuthApp,
+  token: string,
+  bytes: Uint8Array,
+  type = "image/jpeg",
+) {
+  const response = await kit.app.fetch(
+    new Request("http://localhost/media/listing-photos", {
+      method: "PUT",
+      headers: {
+        "content-type": type,
+        "content-length": String(bytes.length),
+        authorization: `Bearer ${token}`,
+        "x-rouvix-client": "spec",
+      },
+      body: bytes as BodyInit,
+    }),
+  );
+  return {
+    status: response.status,
+    key: ((await response.json()) as { key?: string }).key ?? "",
+  };
+}

@@ -5,6 +5,7 @@ import { createApp } from "@/app";
 import { createAuth } from "@/auth/auth";
 import { mongo } from "@/config/db";
 import { clientHeader } from "@/http/csrf";
+import { memoryBucket } from "~/bucket";
 import { fakeGeocoder } from "~/geocoder";
 import { memorySmsSender } from "~/sms";
 
@@ -17,6 +18,7 @@ export function authApp() {
   const mailer = createMemoryMailer();
   const sms = memorySmsSender();
   const geocoder = fakeGeocoder();
+  const storage = memoryBucket();
   const auth = createAuth({
     db: mongo.db,
     clock,
@@ -27,6 +29,7 @@ export function authApp() {
     sms,
     mailer,
     geocoder,
+    media: storage.bucket,
     now: () => new Date(clock.now()),
   });
   // A client sending the session `token` as a bearer, and `language` as
@@ -40,7 +43,7 @@ export function authApp() {
         ...(language && { "accept-language": language }),
       },
     });
-  return { auth, app, mailer, sms, geocoder, clock, client };
+  return { auth, app, mailer, sms, geocoder, storage, clock, client };
 }
 
 export type AuthApp = ReturnType<typeof authApp>;

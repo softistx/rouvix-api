@@ -1,5 +1,6 @@
 import { accounts } from "./accounts";
 import { config } from "./config";
+import { listings } from "./listings";
 import { organisations } from "./organisations";
 import { translationResolvers } from "./translations";
 
@@ -7,6 +8,7 @@ import { translationResolvers } from "./translations";
 export const resolvers = [
   accounts,
   config,
+  listings,
   organisations,
   translationResolvers,
 ];

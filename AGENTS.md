@@ -108,3 +108,25 @@ is held in a SCREAMING_SNAKE_CASE constant. Assert `extensions.code`, never the 
   `config.errors.geocoding-unavailable`.
 - The seeded police stations are one central station per city at the city's centre: names and
   points are approximate and the platform admin completes them. No real person's data is seeded.
+
+## Listings and photos
+
+- `listings` and `listingUploads` (`src/modules/listings`) are platform data owned by their
+  author (`authorId`); `orgId` puts a listing in an organisation's register (its agents edit it)
+  and is not a tenant field. Who edits is `requireListingEditor` (`src/auth/guards.ts`): the author
+  or an agent of `orgId`; anybody else, and an unknown or removed listing, is the one 404
+  `listings.errors.listing-not-found`.
+- **Masked by default**: `Query.listing` returns `PublicListing` only, for an open or claimed
+  listing. No author, no question or answer, no phone, no original photo. A place is blurred to
+  three decimals (about 110 m) unless the item is kept at a police station or an organisation. For
+  an ID document (`documentType` set) the free text, the attributes and the photos are withheld
+  until the OCR and blur slice. `listings.schema.spec.ts` fixes what a visitor can reach and
+  `test/e2e/listings.leak.e2e.spec.ts` reads it as text.
+- Photos go through `@softistx/alxia-media` (`/media/listing-photos`, `src/http/media.ts`): the
+  only transport beside `/graphql`, over a private bucket (`S3_*`), a key never a URL, no presigned
+  URL. The upload is sniffed (jpeg, png, webp, 8 MB), decoded and re-encoded as one WebP of 1600 px at
+  most, which drops EXIF, GPS and XMP; the original is never stored. A listing carries only keys its
+  author uploaded (`listingUploads`), each once. `Photo.status` is settled after the write by the
+  background job (`PhotosService.settle`); a photo missing from the bucket is dropped.
+- Specs use `test/bucket.ts` (an in-memory bucket) and drawn pictures (`test/images.ts`), never a
+  real photo or ID image.

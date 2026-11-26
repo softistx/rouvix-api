@@ -1,0 +1,9 @@
+{
+  "listings.errors.listing-not-found": "This listing could not be found.",
+  "listings.errors.category-invalid": "The category \"{key}\" is unknown or inactive.",
+  "listings.errors.document-type-invalid": "The document type {reason, select, required {is required for a documents category} unexpected {only makes sense for a documents category} other {is not offered in this country}}.",
+  "listings.errors.photo-invalid": "{reason, select, duplicate {This photo is already in the listing.} other {This photo is unknown, or already used by another listing.}}",
+  "listings.errors.invalid-status": "This listing can no longer be changed: it is {status, select, DRAFT {a draft} PENDING {waiting for its photos} OPEN {published} CLAIMED {claimed} CLOSED {closed} EXPIRED {expired} other {removed}}.",
+  "listings.errors.extension-limit": "This listing was already extended {limit, plural, one {# time} other {# times}}, the maximum.",
+  "listings.errors.stale-version": "The listing changed at the same time. Reload it and try again."
+}

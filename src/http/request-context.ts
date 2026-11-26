@@ -1,3 +1,4 @@
+import type { MediaBucket } from "@softistx/alxia-media";
 import type { Mailer } from "@softistx/mail";
 import type { Viewer } from "../auth/access";
 import type { Auth } from "../auth/auth";
@@ -15,6 +16,7 @@ export interface ContextDeps {
   sms: SmsSender;
   mailer: Mailer;
   geocoder: Geocoder;
+  media: MediaBucket;
   now: Now;
 }
 
@@ -25,5 +27,7 @@ export function requestContext(deps: ContextDeps) {
     serverContext: { viewer },
   }: {
     serverContext: { viewer: Viewer | null };
-  }) => ({ services: services({ ...deps, viewer }) });
+  }) => ({
+    services: services({ ...deps, background: deps.auth.background, viewer }),
+  });
 }
