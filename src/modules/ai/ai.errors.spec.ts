@@ -4,6 +4,7 @@ import {
   codes,
   documentPhoto,
   photoNotFound,
+  suggestionUnavailable,
 } from "./ai.errors";
 
 describe("codes", () => {
@@ -11,6 +12,7 @@ describe("codes", () => {
     expect(codes).toEqual([
       "ai.errors.document-photo",
       "ai.errors.unavailable",
+      "ai.errors.suggestion-unavailable",
       "ai.errors.photo-not-found",
     ]);
   });
@@ -24,6 +26,10 @@ describe("refusals", () => {
     });
     expect(aiUnavailable().extensions).toMatchObject({
       code: "ai.errors.unavailable",
+      http: { status: 503 },
+    });
+    expect(suggestionUnavailable().extensions).toMatchObject({
+      code: "ai.errors.suggestion-unavailable",
       http: { status: 503 },
     });
     expect(photoNotFound().extensions).toMatchObject({

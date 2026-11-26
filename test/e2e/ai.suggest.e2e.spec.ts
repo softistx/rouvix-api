@@ -40,7 +40,9 @@ const suggest = (
   extra: { categoryKey?: string } = {},
 ) =>
   kit.client(token).query(SUGGEST, {
-    variables: { input: { photoKey, countryCode: "CM", ...extra } },
+    variables: {
+      input: { photoKey, countryCode: "CM", categoryKey: "PHONE", ...extra },
+    },
   });
 
 describe("suggestFromPhoto", () => {
@@ -94,6 +96,21 @@ describe("suggestFromPhoto", () => {
     expect(kit.claude.model.requests).toEqual([]);
   });
 
+  test("a missing, unknown or non-object category is refused with 422", async () => {
+    const { token } = await signedIn(kit);
+    const key = await photoOf(kit, token);
+    for (const categoryKey of ["NOPE", "CNI"]) {
+      expect(codeOf(await suggest(token, key, { categoryKey }))).toBe(
+        "ai.errors.document-photo",
+      );
+    }
+    const missing = await kit.client(token).query(SUGGEST, {
+      variables: { input: { photoKey: key, countryCode: "CM" } as never },
+    });
+    expect(missing.errors?.length).toBeGreaterThan(0);
+    expect(kit.claude.model.requests).toEqual([]);
+  });
+
   test("a document category is refused with 422 and Claude is never called", async () => {
     const { token } = await signedIn(kit);
     const key = await photoOf(kit, token);
@@ -123,12 +140,12 @@ describe("suggestFromPhoto", () => {
     expect(kit.claude.model.requests).toEqual([]);
   });
 
-  test("Claude down answers 503 `unavailable`", async () => {
+  test("Claude down answers 503 `suggestion-unavailable`", async () => {
     const { token } = await signedIn(kit);
     const key = await photoOf(kit, token);
     kit.claude.fail();
     const result = await suggest(token, key);
-    expect(codeOf(result)).toBe("ai.errors.unavailable");
+    expect(codeOf(result)).toBe("ai.errors.suggestion-unavailable");
     expect(result.status).toBe(503);
   });
 
@@ -136,7 +153,9 @@ describe("suggestFromPhoto", () => {
     const { token } = await signedIn(kit);
     const key = await photoOf(kit, token);
     await kit.client(token, "en").query(SUGGEST, {
-      variables: { input: { photoKey: key, countryCode: "CM" } },
+      variables: {
+        input: { photoKey: key, countryCode: "CM", categoryKey: "PHONE" },
+      },
     });
     expect(kit.claude.model.requests[0]?.system?.[0]?.text).toContain(
       "English",

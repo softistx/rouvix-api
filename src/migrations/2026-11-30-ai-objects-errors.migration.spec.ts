@@ -5,7 +5,10 @@ import { freshMigrationDb, type RawDoc } from "~/migrations";
 import { aiObjectsErrors, id } from "./2026-11-30-ai-objects-errors.migration";
 
 const list = [aiObjectsErrors];
-const created = ["ai.errors.photo-not-found"];
+const created = [
+  "ai.errors.photo-not-found",
+  "ai.errors.suggestion-unavailable",
+];
 let db: Db;
 
 beforeEach(async () => {

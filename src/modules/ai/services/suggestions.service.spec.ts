@@ -19,13 +19,10 @@ beforeEach(async () => {
   kit = authApp();
 });
 
-const input = (
-  photoKey: string,
-  over: { categoryKey?: string | null } = {},
-) => ({
+const input = (photoKey: string, over: { categoryKey?: string } = {}) => ({
   photoKey,
   countryCode: "CM",
-  categoryKey: over.categoryKey ?? null,
+  categoryKey: over.categoryKey ?? "PHONE",
   language: "fr",
 });
 
@@ -130,6 +127,44 @@ describe("a document's photo never reaches the describer", () => {
     expect(kit.ocr.images).toEqual([]);
   });
 
+  test("no object category, no call: the photo with no text to read is not sent on a guess", async () => {
+    const me = await listingsAs(kit);
+    const key = await photoOf(kit, me.token);
+    // A bank card or an ID photo with no readable word says nothing to the
+    // OCR: the author's own category is the barrier, and it must be an
+    // object's (an active root that is no document's).
+    for (const categoryKey of ["NOPE", "CNI", "DOCUMENT"]) {
+      expect(
+        await codeOf(
+          me.services.suggestions.suggest(
+            me.viewer,
+            input(key, { categoryKey }),
+          ),
+        ),
+      ).toBe("ai.errors.document-photo");
+    }
+    expect(kit.claude.model.requests).toEqual([]);
+    expect(kit.ocr.images).toEqual([]);
+  });
+
+  test("an inactive category is refused too", async () => {
+    const me = await listingsAs(kit);
+    const key = await photoOf(kit, me.token);
+    await mongo.db.categories.raw.updateOne(
+      { _id: "KEYS" },
+      { $set: { active: false } },
+    );
+    expect(
+      await codeOf(
+        me.services.suggestions.suggest(
+          me.viewer,
+          input(key, { categoryKey: "KEYS" }),
+        ),
+      ),
+    ).toBe("ai.errors.document-photo");
+    expect(kit.claude.model.requests).toEqual([]);
+  });
+
   test("a photo the local OCR finds ID-like is refused, whatever the form says", async () => {
     const me = await listingsAs(kit);
     const key = await photoOf(kit, me.token);
@@ -192,13 +227,13 @@ describe("a document's photo never reaches the describer", () => {
 });
 
 describe("Claude down or over the cap", () => {
-  test("Claude down is `unavailable`, and the declare flow still works", async () => {
+  test("Claude down is `suggestion-unavailable`, and the declare flow still works", async () => {
     const me = await listingsAs(kit);
     const key = await photoOf(kit, me.token);
     kit.claude.fail();
     expect(
       await codeOf(me.services.suggestions.suggest(me.viewer, input(key))),
-    ).toBe("ai.errors.unavailable");
+    ).toBe("ai.errors.suggestion-unavailable");
     const declared = await me.listings.declare(
       me.viewer,
       { ...lostContent({ photoKeys: [key] }), kind: "LOST", publish: true },
@@ -210,13 +245,13 @@ describe("Claude down or over the cap", () => {
     );
   });
 
-  test("an answer the schema rejects is `unavailable` too", async () => {
+  test("an answer the schema rejects is `suggestion-unavailable` too", async () => {
     const me = await listingsAs(kit);
     const key = await photoOf(kit, me.token);
     kit.claude.answer({ nonsense: true });
     expect(
       await codeOf(me.services.suggestions.suggest(me.viewer, input(key))),
-    ).toBe("ai.errors.unavailable");
+    ).toBe("ai.errors.suggestion-unavailable");
   });
 
   test("past the day's cap Claude is not called", async () => {
@@ -226,7 +261,7 @@ describe("Claude down or over the cap", () => {
     await me.services.suggestions.suggest(me.viewer, input(key));
     expect(
       await codeOf(me.services.suggestions.suggest(me.viewer, input(key))),
-    ).toBe("ai.errors.unavailable");
+    ).toBe("ai.errors.suggestion-unavailable");
     expect(kit.claude.model.requests).toHaveLength(2);
   });
 

@@ -342,7 +342,9 @@ services:
 
   # One-shot: starts a server of its own on `edge` (the only network with
   # egress), pulls the model into the volume (a no-op once it is there) and
-  # exits. It never serves the API.
+  # exits. It never serves the API, and it never fails the deploy: Ollama is
+  # optional (a search ranks by its words without it), so a pull that fails is
+  # a warning and the one-shot still completes.
   ollama-embed-pull:
     <<: *oneshot
     networks: [edge]
@@ -359,10 +361,10 @@ services:
         n=0
         until ollama list >/dev/null 2>&1; do
           n=$$((n + 1))
-          [ "$$n" -ge 60 ] && { echo "ollama-embed-pull: no server after 60 s" >&2; exit 1; }
+          [ "$$n" -ge 60 ] && { echo "ollama-embed-pull: no server after 60 s, skipped" >&2; exit 0; }
           sleep 1
         done
-        ollama pull nomic-embed-text
+        ollama pull nomic-embed-text || echo "ollama-embed-pull: the model was not pulled, searches rank by their words" >&2
 
   # ── the API ─────────────────────────────────────────────────────────────────
   api-migrate:

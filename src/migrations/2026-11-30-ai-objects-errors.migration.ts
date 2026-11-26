@@ -9,7 +9,7 @@ import {
 
 export const id = "2026-11-30-ai-objects-errors";
 
-// The message of the AI pipeline's photo-not-found code. `down` deletes exactly the keys `up` created.
+// The messages of the AI pipeline's photo-not-found and suggestion-unavailable codes. `down` deletes exactly the keys `up` created.
 const seeds = () => translationSeeds({ fr, en });
 
 export const aiObjectsErrors = defineMigration({

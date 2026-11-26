@@ -8,7 +8,7 @@ export const aiResolvers: Resolvers = {
       return ctx.services.suggestions.suggest(viewer, {
         photoKey: input.photoKey,
         countryCode: input.countryCode,
-        categoryKey: input.categoryKey ?? null,
+        categoryKey: input.categoryKey,
         language: ctx.language,
       });
     },

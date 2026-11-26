@@ -7,6 +7,7 @@ import { fail } from "@/shared/errors";
 export const codes = defineCodes("ai", [
   "document-photo",
   "unavailable",
+  "suggestion-unavailable",
   "photo-not-found",
 ]);
 
@@ -15,11 +16,15 @@ export const codes = defineCodes("ai", [
 export const documentPhoto = () =>
   fail("ai.errors.document-photo", { status: 422 });
 
-// No suggestion can be made right now: the local check could not run (the OCR
-// is down), Claude is down or over the day's cap. Nothing is sent or nothing
-// comes back, and the declare form works without a suggestion.
+// The local check could not run (the OCR is down): nothing is sent (fail
+// closed), the declare form works without a suggestion.
 export const aiUnavailable = () =>
   fail("ai.errors.unavailable", { status: 503 });
+
+// Claude gave no suggestion: it is down, answered what the schema rejects, has
+// no key here, or the day's cap is reached. The declare form works without one.
+export const suggestionUnavailable = () =>
+  fail("ai.errors.suggestion-unavailable", { status: 503 });
 
 // The photo key names no upload of the viewer's: one answer for an unknown key
 // and for another account's photo.

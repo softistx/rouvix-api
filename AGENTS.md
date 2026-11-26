@@ -21,7 +21,12 @@ plugin's (`build-an-alxia-graphql-api`, `add-a-module`, its `conventions-reviewe
   another organisation gets `not-found`.
 - **ID documents never leave the VPS**: their photos go to the local OCR and blur only,
   never to Claude or any other remote service; a guard refuses the call and a spec
-  proves it. The original photo is private and deleted when the listing closes.
+  proves it. The original photo is private and deleted when the listing closes. The guard
+  is a heuristic: the local OCR cannot tell an ID photo with no readable text (blurred,
+  angled, a card seen from its back) from an object's, so `suggestFromPhoto` also requires
+  the author's own `categoryKey`, an active root that is no document's, before anything is
+  sent; the photo's pixels are then the author's word against ours, and the prompt (empty
+  fields, title `Document`) is the last backstop. That residual risk is accepted.
 - **Masked by default**: no resolver returns a full ID number, a holder's full name, a
   phone number or an original ID photo to anyone but the person entitled to it (see
   spec §8); a leak spec per module guards it.
@@ -136,6 +141,8 @@ is held in a SCREAMING_SNAKE_CASE constant. Assert `extensions.code`, never the 
   most, which drops EXIF, GPS and XMP; the original is never stored. A listing carries only keys its
   author uploaded (`listingUploads`), each once. `Photo.status` is settled after the write by the
   background job (`PhotosService.settle`); a photo missing from the bucket is dropped.
+- Photo suggestions (`suggestFromPhoto`) are limited by the platform-wide `CLAUDE_DAILY_CAP` only: one
+  account can spend the day's budget (a per-account limit on the Throttle port is on the roadmap).
 - Specs use `test/bucket.ts` (an in-memory bucket) and drawn pictures (`test/images.ts`), never a
   real photo or ID image.
 - Writes of a listing replace its content whole (a field given is the new value) under `version`,

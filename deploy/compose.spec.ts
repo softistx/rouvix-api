@@ -102,6 +102,15 @@ describe("the deploy compose file", () => {
     );
   });
 
+  test("a model pull that fails does not fail the deploy: Ollama is optional", async () => {
+    const parsed = Bun.YAML.parse(await Bun.file(files.deploy).text()) as {
+      services: Record<string, { entrypoint?: string[] }>;
+    };
+    const script = parsed.services["ollama-embed-pull"]?.entrypoint?.join("\n");
+    expect(script).toContain("ollama pull nomic-embed-text ||");
+    expect(script).not.toMatch(/exit [1-9]/);
+  });
+
   test("the example env file holds no real secret", async () => {
     const text = await Bun.file("deploy/.env.example").text();
     const values = text

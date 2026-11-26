@@ -7,7 +7,11 @@ import {
 import type { CategoriesService } from "@/modules/config";
 import type { PhotosService } from "@/modules/listings";
 import { messageOf } from "@/shared/errors";
-import { aiUnavailable, photoNotFound } from "../ai.errors";
+import {
+  documentPhoto,
+  photoNotFound,
+  suggestionUnavailable,
+} from "../ai.errors";
 import { type Suggestion, suggestionOf } from "../ai.rules";
 import type { RemotePhotoGuard } from "./remote-photo-guard.service";
 import type { UsageService } from "./usage.service";
@@ -18,13 +22,14 @@ export interface SuggestionDeps {
   describer: ObjectDescriber;
   usage: Pick<UsageService, "claim" | "record">;
   photos: Pick<PhotosService, "uploadedBytes">;
-  categories: Pick<CategoriesService, "list">;
+  categories: Pick<CategoriesService, "find" | "list">;
 }
 
 export interface SuggestInput {
   photoKey: string;
   countryCode: string;
-  categoryKey: string | null;
+  // The category the author chose: an active root that is no document's.
+  categoryKey: string;
   // `fr` or `en`.
   language: string;
 }
@@ -39,7 +44,7 @@ export interface ObjectSuggestion extends Suggestion {
 // from it. The photo goes through `RemotePhotoGuard` and nowhere else: an ID
 // document's, or one that looks like it, is refused before any call, and the
 // OCR being down refuses it too. Claude down, or over the day's cap, is
-// `ai.errors.unavailable`: the declare form works without a suggestion.
+// `ai.errors.suggestion-unavailable`: the declare form works without a suggestion.
 export class SuggestionsService {
   constructor(private readonly deps: SuggestionDeps) {}
 
@@ -47,6 +52,19 @@ export class SuggestionsService {
     viewer: Viewer,
     input: SuggestInput,
   ): Promise<ObjectSuggestion> {
+    // The author says what the object is before anything is sent: a photo with
+    // no readable text, which the local OCR cannot tell from an ID document's,
+    // is only sent for an object's category (AGENTS.md, "ID documents never
+    // leave the VPS").
+    const chosen = await this.deps.categories.find(input.categoryKey);
+    if (
+      chosen === undefined ||
+      !chosen.active ||
+      chosen.parent !== null ||
+      chosen.isDocument
+    ) {
+      throw documentPhoto();
+    }
     const bytes = await this.deps.photos.uploadedBytes(
       viewer.id,
       input.photoKey,
@@ -68,7 +86,9 @@ export class SuggestionsService {
       await this.deps.usage.record(described.usage);
     } catch (error) {
       // The call is made and counted: the tokens missing is no reason to refuse.
-      console.error("rouvix-api: Claude's tokens were not counted:", error);
+      console.error(
+        `rouvix-api: Claude's tokens were not counted: ${messageOf(error)}`,
+      );
     }
     return {
       ...suggestionOf(
@@ -87,7 +107,7 @@ export class SuggestionsService {
     offered: Awaited<ReturnType<CategoriesService["list"]>>,
     language: string,
   ) {
-    if (!(await this.deps.usage.claim())) throw aiUnavailable();
+    if (!(await this.deps.usage.claim())) throw suggestionUnavailable();
     try {
       return await this.deps.describer.describe(
         // The stored rendition of every photo is a WebP (src/modules/listings).
@@ -104,7 +124,7 @@ export class SuggestionsService {
       console.error(
         `rouvix-api: Claude gave no suggestion: ${messageOf(error)}`,
       );
-      throw aiUnavailable();
+      throw suggestionUnavailable();
     }
   }
 }
