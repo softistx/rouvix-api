@@ -141,4 +141,26 @@ describe("pages and counts", () => {
       { categoryKey: "PHONE", count: 1 },
     ]);
   });
+
+  test("a listing closed between the two reads is dropped from the page", async () => {
+    const me = await listingsAs(kit);
+    const doomed = await publishFound(me, { title: "Clé fantôme" });
+    await publishFound(me, { title: "Clé restante" });
+    const closing = {
+      rank: async (_: unknown, c: readonly unknown[]) => {
+        await me.listings.close(me.viewer, doomed._id.toHexString(), "OTHER");
+        return c as never;
+      },
+    };
+    const service = new SearchService(mongo, {
+      now: () => new Date(kit.clock.now()),
+      ranker: closing,
+    });
+    const page = await service.search(
+      { text: "clé" },
+      { first: 5, after: null },
+      "RELEVANCE",
+    );
+    expect(page.edges.map((e) => e.node.title)).toEqual(["Clé restante"]);
+  });
 });

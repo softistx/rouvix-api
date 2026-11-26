@@ -186,11 +186,15 @@ export class SearchService {
     };
   }
 
-  // The documents of `ids`, in that order (one that went since is dropped).
+  // The documents of `ids`, in that order (one closed, removed or expired since the first read is dropped).
   private async load(ids: readonly ObjectId[]) {
     if (ids.length === 0) return [];
     const found = await this.mongo.db.listings.findMany({
-      filter: { _id: { $in: [...ids] } },
+      filter: {
+        _id: { $in: [...ids] },
+        status: "OPEN",
+        expiresAt: { $gt: this.deps.now() },
+      },
     });
     const byId = new Map(found.map((doc) => [doc._id.toHexString(), doc]));
     return ids.flatMap((id) => byId.get(id.toHexString()) ?? []);
