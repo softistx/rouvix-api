@@ -1,4 +1,5 @@
 import { type MediaBucket, mediaObjectKey } from "@softistx/alxia-media";
+import { z } from "zod";
 import type { AppMongo } from "@/config/db";
 import { locked } from "../listings.errors";
 import { PHOTO_FULL, PHOTO_KIND } from "../listings.media";
@@ -36,6 +37,8 @@ export class PhotosService {
     accountId: string,
     key: string,
   ): Promise<Uint8Array | undefined> {
+    // A media key is a UUID: anything else names no upload.
+    if (!z.uuid().safeParse(key).success) return undefined;
     const upload = await this.mongo.db.listingUploads.findById(key);
     if (upload === undefined || upload.accountId !== accountId) {
       return undefined;

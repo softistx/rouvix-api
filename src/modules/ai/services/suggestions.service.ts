@@ -6,6 +6,7 @@ import {
 } from "@/describer";
 import type { CategoriesService } from "@/modules/config";
 import type { PhotosService } from "@/modules/listings";
+import { messageOf } from "@/shared/errors";
 import { aiUnavailable, photoNotFound } from "../ai.errors";
 import { type Suggestion, suggestionOf } from "../ai.rules";
 import type { RemotePhotoGuard } from "./remote-photo-guard.service";
@@ -101,7 +102,7 @@ export class SuggestionsService {
       );
     } catch (error) {
       console.error(
-        `rouvix-api: Claude gave no suggestion: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`,
+        `rouvix-api: Claude gave no suggestion: ${messageOf(error)}`,
       );
       throw aiUnavailable();
     }

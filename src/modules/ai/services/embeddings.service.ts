@@ -1,5 +1,6 @@
 import type { Embedder } from "@/embedder";
 import type { ListingEmbeddings, ListingsService } from "@/modules/listings";
+import { messageOf } from "@/shared/errors";
 import { embeddingTextOf, textHashOf } from "../ai.rules";
 
 export interface EmbeddingDeps {
@@ -27,7 +28,7 @@ export class EmbeddingsService {
       await this.embedWithRetry(listingId);
     } catch (error) {
       console.error(
-        `rouvix-api: listing ${listingId} not embedded: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`,
+        `rouvix-api: listing ${listingId} not embedded: ${messageOf(error)}`,
       );
     }
   }

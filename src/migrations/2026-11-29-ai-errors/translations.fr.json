@@ -1,4 +1,4 @@
 {
   "ai.errors.document-photo": "Cette photo ressemble à une pièce d'identité : elle reste sur nos serveurs. Choisissez la catégorie Documents pour la déclarer.",
-  "ai.errors.unavailable": "La vérification de la photo est indisponible pour le moment : continuez sans suggestion."
+  "ai.errors.unavailable": "Aucune suggestion n'est disponible pour le moment : continuez sans."
 }

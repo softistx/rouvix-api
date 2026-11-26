@@ -21,6 +21,12 @@ const SUGGEST = graphql(`
   }
 `);
 
+const DECLARE = graphql(`
+  mutation DeclareForSuggest($input: DeclareListingInput!) {
+    declareListing(input: $input) { id }
+  }
+`);
+
 let kit: AuthApp;
 beforeEach(async () => {
   await clearDatabase();
@@ -102,22 +108,15 @@ describe("suggestFromPhoto", () => {
     kit.ocr.answer(fakeCniLines());
     expect(codeOf(await suggest(token, like))).toBe("ai.errors.document-photo");
     const doc = await photoOf(kit, token);
-    await kit.client(token).query(
-      graphql(`
-        mutation DeclareForSuggest($input: DeclareListingInput!) {
-          declareListing(input: $input) { id }
-        }
-      `),
-      {
-        variables: {
-          input: {
-            kind: "FOUND",
-            content: documentContent({ photoKeys: [doc] }),
-            publish: true,
-          },
+    await kit.client(token).query(DECLARE, {
+      variables: {
+        input: {
+          kind: "FOUND",
+          content: documentContent({ photoKeys: [doc] }),
+          publish: true,
         },
       },
-    );
+    });
     await kit.auth.background.settled();
     kit.ocr.answer([]);
     expect(codeOf(await suggest(token, doc))).toBe("ai.errors.document-photo");

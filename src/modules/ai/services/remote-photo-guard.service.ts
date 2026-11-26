@@ -1,4 +1,8 @@
-import type { CategoriesService, CountriesService } from "@/modules/config";
+import {
+  type CategoriesService,
+  type CountriesService,
+  countryNotFound,
+} from "@/modules/config";
 import { compilePatterns, isIdLike, type Ocr } from "@/ocr";
 import type { Now } from "@/shared/dates";
 import { aiUnavailable, documentPhoto } from "../ai.errors";
@@ -51,9 +55,9 @@ export class RemotePhotoGuard {
       throw documentPhoto();
     }
     // The country's own number patterns are part of the check: a country the
-    // platform does not serve would switch them off, so it fails closed.
+    // platform does not serve would switch them off, so it is refused (nothing is sent).
     const country = await this.deps.countries.active(photo.countryCode);
-    if (country === undefined) throw aiUnavailable();
+    if (country === undefined) throw countryNotFound(photo.countryCode);
     let text: Awaited<ReturnType<Ocr["read"]>>;
     try {
       text = await this.deps.ocr.read(photo.bytes);

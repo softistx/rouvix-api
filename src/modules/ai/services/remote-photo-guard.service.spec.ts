@@ -117,7 +117,7 @@ describe("the remote photo guard", () => {
     expect(remote.sent).toEqual([]);
   });
 
-  test("fails closed for a country the platform does not serve, whose number patterns would be off", async () => {
+  test("refuses a country the platform does not serve, whose number patterns would be off", async () => {
     const me = await listingsAs(kit);
     const remote = remoteSpy();
     kit.ocr.answer(["NOM/SURNAME", "ESSAI", "N° 9907315846"]);
@@ -128,7 +128,7 @@ describe("the remote photo guard", () => {
           remote.call,
         ),
       );
-      expect(error.extensions["code"]).toBe("ai.errors.unavailable");
+      expect(error.extensions["code"]).toBe("config.errors.country-not-found");
     }
     expect(remote.sent).toEqual([]);
   });

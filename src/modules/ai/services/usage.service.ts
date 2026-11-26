@@ -29,19 +29,23 @@ export class UsageService {
   async claim(): Promise<boolean> {
     const { dailyCap } = this.deps;
     if (dailyCap <= 0) return false;
-    try {
-      await this.mongo.db.aiUsage.raw.updateOne(
-        { _id: this.idOf(), calls: { $lt: dailyCap } },
-        {
-          $inc: { calls: 1 },
-          $setOnInsert: { inputTokens: 0, outputTokens: 0 },
-        },
-        { upsert: true },
-      );
-      return true;
-    } catch (error) {
-      if ((error as { code?: number }).code === DUPLICATE_KEY) return false;
-      throw error;
+    // Twice: on the day's first calls, two inserts race and the loser sees a
+    // duplicate key although the cap is far; its second try finds the document.
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await this.mongo.db.aiUsage.raw.updateOne(
+          { _id: this.idOf(), calls: { $lt: dailyCap } },
+          {
+            $inc: { calls: 1 },
+            $setOnInsert: { inputTokens: 0, outputTokens: 0 },
+          },
+          { upsert: true },
+        );
+        return true;
+      } catch (error) {
+        if ((error as { code?: number }).code !== DUPLICATE_KEY) throw error;
+        if (attempt >= 2) return false;
+      }
     }
   }
 

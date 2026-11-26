@@ -33,9 +33,9 @@ plugin's (`build-an-alxia-graphql-api`, `add-a-module`, its `conventions-reviewe
 ## Source layout
 
 `src/` has the entry points at its root (`server.ts`, `app.ts`, its spec) and a folder per
-concern: `config` (env, db, redis, sms, auth), `http` (context, schema, csrf, limits),
+concern: `config` (env, db, redis, sms, auth, ai), `http` (context, schema, csrf, limits),
 `auth` (`auth.ts` janus, `access.ts`, `guards.ts`), `tenancy` (`scoped()`, the directory),
-`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder`, `throttle`, `storage`, `ocr`
+`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder`, `describer`, `embedder`, `throttle`, `storage`, `ocr`
 (with the readers of OCR text: the zone, the ID-like check), `redactor` and `vault` (the ports'
 adapters), `shared`,
 `migrations` (with its `kit/`), `scripts` and `modules`. A module is `modules/<name>/`:

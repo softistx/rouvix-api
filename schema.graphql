@@ -862,9 +862,10 @@ type Mutation {
   Refusals: `ai.errors.document-photo` (422: a document category, an ID
   photo's key, or a photo the server's own OCR finds ID-like; nothing is sent
   to Claude), `ai.errors.unavailable` (503: the local check could not run,
-  Claude is down or the day's cap is reached: the declare form goes on without
-  a suggestion), `ai.errors.photo-not-found` (404: no such upload of the
-  viewer's).
+  Claude is down or the day's cap is reached: the declare form goes on
+  without a suggestion), `ai.errors.photo-not-found` (404: no such upload of
+  the viewer's), `config.errors.country-not-found` (400: `countryCode` is not
+  a country the platform serves).
   """
   suggestFromPhoto(input: SuggestFromPhotoInput!): ObjectSuggestion!
   """

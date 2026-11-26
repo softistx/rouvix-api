@@ -1,5 +1,6 @@
 import type { Embedder } from "@/embedder";
 import type { Candidate, ListingRanker } from "@/modules/search";
+import { messageOf } from "@/shared/errors";
 import { blendedScore, cosine } from "./ai.rules";
 
 export interface EmbeddingRankerDeps {
@@ -52,7 +53,7 @@ export function embeddingRanker(deps: EmbeddingRankerDeps): ListingRanker {
         return scored.map(({ candidate }) => candidate);
       } catch (error) {
         console.error(
-          `rouvix-api: search ranked by its words only: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`,
+          `rouvix-api: search ranked by its words only: ${messageOf(error)}`,
         );
         return deps.fallback.rank(query, candidates);
       }
