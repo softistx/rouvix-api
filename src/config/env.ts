@@ -152,7 +152,7 @@ const parsed = defineEnv({
   ),
   // Claude, which suggests an object's description from its photo (spec
   // §4.3): its API key and model. Unset, there is no suggestion
-  // (`ai.errors.unavailable`) and the declare form works without one. The
+  // (`ai.errors.suggestion-unavailable`) and the declare form works without one. The
   // model is the newest the @softistx/ai-anthropic docs name.
   ANTHROPIC_API_KEY: z
     .string()

@@ -38,7 +38,7 @@ could not check is treated as an ID's (shown blurred).
 Two AI services, both optional: the API runs, the declare form and the search work, without either.
 
 - **Claude** suggests an object's description from its photo (`suggestFromPhoto`, spec §4.3). Set
-  `ANTHROPIC_API_KEY` in `deploy/.env` (empty means no suggestion: `ai.errors.unavailable`).
+  `ANTHROPIC_API_KEY` in `deploy/.env` (empty means no suggestion: `ai.errors.suggestion-unavailable`).
   `ANTHROPIC_MODEL` defaults to the newest model the `@softistx/ai-anthropic` docs name. The call is
   counted in `aiUsage` (one document per UTC day: calls and tokens) and refused past
   `CLAUDE_DAILY_CAP` calls a day for the whole platform (default 200, `0` turns it off). Read the day's

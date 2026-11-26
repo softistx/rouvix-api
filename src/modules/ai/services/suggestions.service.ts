@@ -6,7 +6,7 @@ import {
 } from "@/describer";
 import type { CategoriesService } from "@/modules/config";
 import type { PhotosService } from "@/modules/listings";
-import { messageOf } from "@/shared/errors";
+import { invalidInput, messageOf } from "@/shared/errors";
 import {
   documentPhoto,
   photoNotFound,
@@ -57,13 +57,15 @@ export class SuggestionsService {
     // is only sent for an object's category (AGENTS.md, "ID documents never
     // leave the VPS").
     const chosen = await this.deps.categories.find(input.categoryKey);
-    if (
-      chosen === undefined ||
-      !chosen.active ||
-      chosen.parent !== null ||
-      chosen.isDocument
-    ) {
-      throw documentPhoto();
+    if (chosen?.isDocument === true) throw documentPhoto();
+    if (chosen === undefined || !chosen.active || chosen.parent !== null) {
+      throw invalidInput([
+        {
+          path: "categoryKey",
+          code: "listings.errors.category-invalid",
+          params: { key: input.categoryKey },
+        },
+      ]);
     }
     const bytes = await this.deps.photos.uploadedBytes(
       viewer.id,
@@ -101,7 +103,7 @@ export class SuggestionsService {
   }
 
   // The call, once the guard let the photo through: counted against the cap
-  // first, and any failure of Claude is the one `unavailable` answer.
+  // first, and any failure of Claude is the one `suggestion-unavailable` answer.
   private async ask(
     bytes: Uint8Array,
     offered: Awaited<ReturnType<CategoriesService["list"]>>,

@@ -861,11 +861,12 @@ type Mutation {
   colours, brand, marks). Needs a signed-in, unsuspended account.
   Refusals: `ai.errors.document-photo` (422: a document category, an ID
   photo's key, or a photo the server's own OCR finds ID-like; nothing is sent
-  to Claude; a missing or document `categoryKey` too), `ai.errors.unavailable`
+  to Claude; a document `categoryKey` too), `ai.errors.unavailable`
   (503: the local check could not run), `ai.errors.suggestion-unavailable`
   (503: Claude is down, has no key or the day's cap is reached: the declare
   form goes on without a suggestion), `ai.errors.photo-not-found` (404: no such upload of
-  the viewer's), `config.errors.country-not-found` (400: `countryCode` is not
+  the viewer's), `listings.errors.category-invalid` (400, on `categoryKey`),
+  `config.errors.country-not-found` (400: `countryCode` is not
   a country the platform serves).
   """
   suggestFromPhoto(input: SuggestFromPhotoInput!): ObjectSuggestion!
@@ -1298,8 +1299,9 @@ enum SortDirection {
 input SuggestFromPhotoInput {
   """
   The category the author chose before asking: an active root category that is
-  no document's. Any other (a document one, a child, an unknown key) is
-  `ai.errors.document-photo`, and nothing is sent.
+  no document's. A document one is `ai.errors.document-photo`; an unknown,
+  inactive or non-root key is `listings.errors.category-invalid` on
+  `categoryKey`; nothing is read or sent either way.
   """
   categoryKey: String! @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
   """The country the item is declared in, for the local ID-like check."""

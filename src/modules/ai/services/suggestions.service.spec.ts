@@ -133,7 +133,11 @@ describe("a document's photo never reaches the describer", () => {
     // A bank card or an ID photo with no readable word says nothing to the
     // OCR: the author's own category is the barrier, and it must be an
     // object's (an active root that is no document's).
-    for (const categoryKey of ["NOPE", "CNI", "DOCUMENT"]) {
+    for (const [categoryKey, code] of [
+      ["NOPE", "validation.errors.invalid-input"],
+      ["CNI", "ai.errors.document-photo"],
+      ["DOCUMENT", "ai.errors.document-photo"],
+    ] as const) {
       expect(
         await codeOf(
           me.services.suggestions.suggest(
@@ -141,7 +145,7 @@ describe("a document's photo never reaches the describer", () => {
             input(key, { categoryKey }),
           ),
         ),
-      ).toBe("ai.errors.document-photo");
+      ).toBe(code);
     }
     expect(kit.claude.model.requests).toEqual([]);
     expect(kit.ocr.images).toEqual([]);
@@ -161,7 +165,7 @@ describe("a document's photo never reaches the describer", () => {
           input(key, { categoryKey: "KEYS" }),
         ),
       ),
-    ).toBe("ai.errors.document-photo");
+    ).toBe("validation.errors.invalid-input");
     expect(kit.claude.model.requests).toEqual([]);
   });
 

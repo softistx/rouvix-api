@@ -96,13 +96,14 @@ describe("suggestFromPhoto", () => {
     expect(kit.claude.model.requests).toEqual([]);
   });
 
-  test("a missing, unknown or non-object category is refused with 422", async () => {
+  test("a document category is 422, an unknown or non-root one is 400, a missing one fails validation", async () => {
     const { token } = await signedIn(kit);
     const key = await photoOf(kit, token);
-    for (const categoryKey of ["NOPE", "CNI"]) {
-      expect(codeOf(await suggest(token, key, { categoryKey }))).toBe(
-        "ai.errors.document-photo",
-      );
+    for (const [categoryKey, code] of [
+      ["NOPE", "validation.errors.invalid-input"],
+      ["CNI", "ai.errors.document-photo"],
+    ] as const) {
+      expect(codeOf(await suggest(token, key, { categoryKey }))).toBe(code);
     }
     const missing = await kit.client(token).query(SUGGEST, {
       variables: { input: { photoKey: key, countryCode: "CM" } as never },
