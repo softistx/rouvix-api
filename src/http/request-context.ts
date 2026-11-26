@@ -9,6 +9,7 @@ import type { Geocoder } from "../geocoder";
 import { services } from "../modules";
 import type { ListingRanker } from "../modules/search";
 import type { Ocr } from "../ocr";
+import type { PushSender } from "../push";
 import type { ImageRedactor } from "../redactor";
 import type { Now } from "../shared/dates";
 import type { SmsSender } from "../sms";
@@ -21,6 +22,8 @@ export interface ContextDeps {
   auth: Auth;
   sms: SmsSender;
   mailer: Mailer;
+  push: PushSender;
+  mail: { from: string; uiUrl: string };
   geocoder: Geocoder;
   media: MediaBucket;
   ocr: Ocr;

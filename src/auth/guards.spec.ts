@@ -24,6 +24,8 @@ const viewer = (suspendedAt: Date | null = null): Viewer => ({
   trustScore: 50,
   finderBadge: false,
   suspendedAt,
+  email: null,
+  emailVerifiedAt: null,
   createdAt: new Date(),
 });
 

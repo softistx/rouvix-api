@@ -1,0 +1,119 @@
+"What a notice is about (spec §5.6): the three events an account chooses among."
+enum NotificationKind {
+  "An item may match one of the account's listings."
+  MATCH
+  "A new message in one of its conversations."
+  MESSAGE
+  "A claim concerns one of its listings, or one it made."
+  CLAIM
+}
+
+"""
+An in-app notice, the account's own. It names the event and the listing it is
+about and nothing more: the client words it from its kind and reads the listing
+through its own guards. No phone number, no ID data, no title.
+"""
+type Notification {
+  id: ID!
+  kind: NotificationKind!
+  "The listing the notice is about, when it is about one."
+  listingId: ID
+  "When the account read it; null while unread."
+  readAt: DateTime
+  createdAt: DateTime!
+}
+
+type NotificationConnection {
+  edges: [NotificationEdge!]! @listSize(assumedSize: 100)
+  pageInfo: PageInfo!
+  totalCount: Int!
+  "How many notices of the account are unread."
+  unreadCount: Int!
+}
+
+type NotificationEdge {
+  node: Notification!
+}
+
+"""
+The account's notification settings (spec §5.6). An account that never saved
+holds the defaults: every event on, no e-mail copies, no previews.
+"""
+type Settings {
+  "The account's language, which also words its pushes and e-mails."
+  locale: Language!
+  "A push and an e-mail copy for a possible match."
+  notifyMatch: Boolean!
+  "... for a new message."
+  notifyMessage: Boolean!
+  "... for a claim."
+  notifyClaim: Boolean!
+  "A copy of each notice that is on, by e-mail, once the address is verified."
+  emailCopies: Boolean!
+  "Item detail (an object's title) in a push or a mail; off, they name the kind of event only."
+  pushPreviews: Boolean!
+}
+
+"The fields given are saved, the others stay."
+input UpdateSettingsInput {
+  locale: Language
+  notifyMatch: Boolean
+  notifyMessage: Boolean
+  notifyClaim: Boolean
+  emailCopies: Boolean
+  pushPreviews: Boolean
+}
+
+"""
+What a browser's `PushManager.subscribe` gives: the push service's endpoint and
+the two keys that encrypt a payload for it. Secrets of the device: never returned.
+"""
+input PushSubscriptionInput {
+  "An https URL of a push service."
+  endpoint: String! @constraint(minLength: 12, maxLength: 2048)
+  "The browser's P-256 key, base64url."
+  p256dh: String!
+    @constraint(minLength: 20, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$")
+  "The browser's auth secret, base64url."
+  auth: String!
+    @constraint(minLength: 8, maxLength: 64, pattern: "^[A-Za-z0-9_-]+$")
+}
+
+extend type Viewer {
+  "The account's notification settings."
+  settings: Settings!
+}
+
+extend type Query {
+  """
+  The signed-in account's notices, newest first. Needs a signed-in,
+  unsuspended account.
+  """
+  notifications(
+    first: Int = 20 @constraint(min: 1, max: 100)
+    after: String
+  ): NotificationConnection!
+}
+
+extend type Mutation {
+  """
+  Marks notices read, all or none: an id that is no notice of the account's
+  (unknown, malformed or another account's) refuses the call,
+  `notifications.errors.notification-not-found` (404) with each such id in
+  `extensions.fields`. A notice already read keeps its date. Needs a signed-in,
+  unsuspended account.
+  """
+  markRead(
+    ids: [ID!]! @constraint(minItems: 1, maxItems: 100)
+  ): [Notification!]! @listSize(assumedSize: 100)
+  "Saves the settings given (and the language) and returns them all."
+  updateSettings(input: UpdateSettingsInput!): Settings!
+  """
+  Subscribes the browser to Web Push; an endpoint belongs to one account (the
+  last to subscribe), and ten browsers at most are kept per account. 503
+  `notifications.errors.push-unavailable` when the server has no push adapter.
+  """
+  subscribePush(input: PushSubscriptionInput!): Boolean!
+  "Forgets the account's subscription for `endpoint`: true when there was one."
+  unsubscribePush(endpoint: String!): Boolean!
+}

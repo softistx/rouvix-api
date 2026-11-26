@@ -40,7 +40,7 @@ plugin's (`build-an-alxia-graphql-api`, `add-a-module`, its `conventions-reviewe
 `src/` has the entry points at its root (`server.ts`, `app.ts`, its spec) and a folder per
 concern: `config` (env, db, redis, sms, auth, ai), `http` (context, schema, csrf, limits),
 `auth` (`auth.ts` janus, `access.ts`, `guards.ts`), `tenancy` (`scoped()`, the directory),
-`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder`, `describer`, `embedder`, `throttle`, `storage`, `ocr`
+`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder`, `push`, `describer`, `embedder`, `throttle`, `storage`, `ocr`
 (with the readers of OCR text: the zone, the ID-like check), `redactor` and `vault` (the ports'
 adapters), `shared`,
 `migrations` (with its `kit/`), `scripts` and `modules`. A module is `modules/<name>/`:
@@ -75,9 +75,9 @@ of a service, a resolver or a data-loader: it goes to the module's `utils`, `rul
 
 ## Ports
 
-`SmsSender` (`src/sms`: the log adapter, Africa's Talking), `Mailer`, `Geocoder`, `Throttle` (`src/throttle`: Redis rate limits, fail open for visitor reads; `memoryThrottle` in `test/throttle.ts`), the search's `ListingRanker` (`textRanker`, or `embeddingRanker` of `src/modules/ai` when `OLLAMA_URL` is set), `ObjectDescriber` (`src/describer`: Claude through `@softistx/ai-anthropic`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `CLAUDE_DAILY_CAP`; reached through `RemotePhotoGuard` only), `Embedder` (`src/embedder`: Ollama `nomic-embed-text` through `@softistx/ai-ollama`, `OLLAMA_URL` refused unless private; `fakeClaude` and `fakeOllama` in `test/ai.ts`), the photos' `MediaBucket` (`src/storage`), and the ID document pipeline's `Ocr` (`src/ocr`: the Tesseract sidecar of `docker/ocr`, its `OCR_URL` refused unless private; `fakeOcr` in `test/ocr.ts`), `ImageRedactor` (`src/redactor`: the whole photo blurred in process) and `IdVault` (`src/vault`: `ID_FIELDS_KEY`) are passed explicitly
+`SmsSender` (`src/sms`: the log adapter, Africa's Talking), `Mailer`, `PushSender` (`src/push`: Web Push behind `VAPID_*`; the log adapter outside production, none yet for production; `fakePush` in `test/push.ts`), `Geocoder`, `Throttle` (`src/throttle`: Redis rate limits, fail open for visitor reads; `memoryThrottle` in `test/throttle.ts`), the search's `ListingRanker` (`textRanker`, or `embeddingRanker` of `src/modules/ai` when `OLLAMA_URL` is set), `ObjectDescriber` (`src/describer`: Claude through `@softistx/ai-anthropic`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `CLAUDE_DAILY_CAP`; reached through `RemotePhotoGuard` only), `Embedder` (`src/embedder`: Ollama `nomic-embed-text` through `@softistx/ai-ollama`, `OLLAMA_URL` refused unless private; `fakeClaude` and `fakeOllama` in `test/ai.ts`), the photos' `MediaBucket` (`src/storage`), and the ID document pipeline's `Ocr` (`src/ocr`: the Tesseract sidecar of `docker/ocr`, its `OCR_URL` refused unless private; `fakeOcr` in `test/ocr.ts`), `ImageRedactor` (`src/redactor`: the whole photo blurred in process) and `IdVault` (`src/vault`: `ID_FIELDS_KEY`) are passed explicitly
 and never defaulted but by `createApp`, from the environment (`SMS_PROVIDER`; the log adapter is
-refused in production). A spec passes `memorySmsSender` (`test/sms.ts`) and the memory mailer.
+refused in production). A spec passes `memorySmsSender` (`test/sms.ts`), the memory mailer and `fakePush`.
 
 ## Errors and migrations
 
@@ -165,3 +165,22 @@ is held in a SCREAMING_SNAKE_CASE constant. Assert `extensions.code`, never the 
   place label is never searched, and `geo` is the public point snapped to about 220 m. Never query
   `place.point`. `search.schema.spec.ts` and `search.leak.e2e.spec.ts` guard this.
 - `search.ranking.ts` holds the `ListingRanker` port (the ranking role).
+
+## Notifications and settings
+
+- `notifications` (`src/modules/notifications`) holds an account's own `notifications` (a notice: its
+  kind and the listing it is about, never a title, a number or ID data), `accountSettings` (defaults
+  until the first `updateSettings`; the language is janus's) and `pushSubscriptions` (endpoint and keys,
+  secrets of the device: never returned). Every operation is the signed-in account's own.
+- The later slices tell an account something through `ctx.services.notifier.notify(accountId,
+  { kind: MATCH | MESSAGE | CLAIM, listingId? })`, and nothing else: the words, the preview and the path
+  are made inside. The notice is always recorded; the push and the e-mail copy go only when that event is
+  on, in the background, and never to a suspended account. A push carries no item detail unless
+  `pushPreviews` is on, and then only an object's own title (`previewOf`: never an ID document's, never
+  an object with a blurred copy, never a title with six digits in a row); the mail follows the same
+  rule and goes to a verified address only (`Account.email` and `emailVerifiedAt`, set by the sign-in).
+  `notifications.schema.spec.ts` and `notify.service.spec.ts` hold it.
+- Web Push has no production adapter: no in-house package signs and encrypts a push, and the API writes no
+  cryptography. `VAPID_*` set in production stops the process; unset, `subscribePush` answers
+  `notifications.errors.push-unavailable`. A push endpoint must be an https URL of a named host
+  (`isPushEndpoint`), ten browsers per account at most.

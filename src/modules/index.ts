@@ -2,6 +2,7 @@ import { accounts } from "./accounts";
 import { ai } from "./ai";
 import { config } from "./config";
 import { listings } from "./listings";
+import { notifications } from "./notifications";
 import { organisations } from "./organisations";
 import { search } from "./search";
 import { translationResolvers } from "./translations";
@@ -12,6 +13,7 @@ export const resolvers = [
   ai,
   config,
   listings,
+  notifications,
   organisations,
   search,
   translationResolvers,

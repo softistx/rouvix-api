@@ -148,4 +148,34 @@ describe("env", () => {
       parsed({ OLLAMA_URL: "https://ollama.example.com" }),
     ).rejects.toThrow();
   });
+  test("the VAPID keys are all three or none, and refuse a malformed key", async () => {
+    const none = await parsed({
+      VAPID_PUBLIC_KEY: undefined,
+      VAPID_PRIVATE_KEY: undefined,
+      VAPID_SUBJECT: undefined,
+    });
+    expect(none.env.VAPID_PUBLIC_KEY).toBeUndefined();
+    const pub = "A".repeat(87);
+    const priv = "B".repeat(43);
+    await expect(
+      parsed({
+        VAPID_PUBLIC_KEY: pub,
+        VAPID_PRIVATE_KEY: undefined,
+        VAPID_SUBJECT: undefined,
+      }),
+    ).rejects.toThrow("VAPID_* is incomplete");
+    await expect(
+      parsed({
+        VAPID_PUBLIC_KEY: "short",
+        VAPID_PRIVATE_KEY: priv,
+        VAPID_SUBJECT: "mailto:ops@rouvix.example.com",
+      }),
+    ).rejects.toThrow();
+    const all = await parsed({
+      VAPID_PUBLIC_KEY: pub,
+      VAPID_PRIVATE_KEY: priv,
+      VAPID_SUBJECT: "mailto:ops@rouvix.example.com",
+    });
+    expect(all.env.VAPID_SUBJECT).toBe("mailto:ops@rouvix.example.com");
+  });
 });

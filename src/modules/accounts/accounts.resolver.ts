@@ -12,6 +12,7 @@ export const accountResolvers: Resolvers = {
   },
   Account: {
     displayName: (account) => account.name,
+    emailVerified: (account) => account.emailVerifiedAt !== null,
     locale: (account) => (account.locale === "en" ? "EN" : "FR"),
   },
 };

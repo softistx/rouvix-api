@@ -8,12 +8,18 @@
 // and edited by the platform admin, and ai's `aiUsage`, the day's count of Claude
 // calls, moved by atomic increments of the usage service alone. The listings' `listings` and `listingUploads`
 // are platform data too: an account's own, owned by its author (`authorId`), with
-// an optional `orgId` for an organisation's register (not a tenant field). `organisations` is the tenant itself; every
+// an optional `orgId` for an organisation's register (not a tenant field). The notifications' `notifications`,
+// `accountSettings` and `pushSubscriptions` are an account's own (`accountId`). `organisations` is the tenant itself; every
 // other collection is organisation-owned (janus keeps its own,
 // src/config/janus-sync.ts).
 
 export { aiUsage } from "./ai/models";
 export { categories, countries, safePlaces } from "./config/models";
 export { listings, listingUploads } from "./listings/models";
+export {
+  accountSettings,
+  notifications,
+  pushSubscriptions,
+} from "./notifications/models";
 export { members, organisations } from "./organisations/models";
 export { translations } from "./translations/translations.model";
