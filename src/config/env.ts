@@ -111,6 +111,21 @@ const parsed = defineEnv({
     .url()
     .default("https://api.africastalking.com")
     .transform((url) => url.replace(/\/+$/, "")),
+  // The private bucket the photos live in (an S3 API: SeaweedFS in the
+  // stack), reached by the API alone through the media routes: no public
+  // endpoint, no presigned URL. Required in production; outside it all unset
+  // means no storage (a `/media` write answers 503), and a partial set stops
+  // the process.
+  S3_ENDPOINT: orUnset(
+    z
+      .string()
+      .regex(/^https?:\/\/[^/]/, "not an http:// or https:// URL")
+      .transform((url) => url.replace(/\/+$/, "")),
+  ),
+  S3_BUCKET: orUnset(z.string().min(1)),
+  S3_ACCESS_KEY_ID: orUnset(z.string().min(1)),
+  S3_SECRET_ACCESS_KEY: orUnset(z.string().min(1)),
+  S3_REGION: z.string().default("us-east-1"),
   // The geocoding provider (OpenStreetMap's Nominatim): its base URL, and the
   // User-Agent its usage policy requires, which names the application and a
   // contact (set in deploy/.env, never in this public repository). Required in
@@ -124,6 +139,19 @@ const parsed = defineEnv({
     "rouvix-api-development",
   ),
 });
+
+const s3Required = [
+  "S3_ENDPOINT",
+  "S3_BUCKET",
+  "S3_ACCESS_KEY_ID",
+  "S3_SECRET_ACCESS_KEY",
+] as const;
+const s3Missing = s3Required.filter((name) => parsed[name] === undefined);
+if (s3Missing.length > 0 && s3Missing.length < s3Required.length) {
+  throw new Error(
+    `S3_* is incomplete: ${s3Missing.join(", ")} unset. Set all of ${s3Required.join(", ")}, or none for no file storage.`,
+  );
+}
 
 if (parsed.SMS_PROVIDER === "africastalking") {
   const missing = (["AT_USERNAME", "AT_API_KEY"] as const).filter(

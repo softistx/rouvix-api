@@ -1,0 +1,272 @@
+"Whether a declaration is of an item lost or found."
+enum ListingKind {
+  "Declared by its owner, who looks for it."
+  LOST
+  "Declared by whoever found it (a person, or an organisation's agent)."
+  FOUND
+}
+
+"Where a listing is in its life."
+enum ListingStatus {
+  "Seen by its author only."
+  DRAFT
+  "Published, waiting for its photos to be processed: not public yet."
+  PENDING
+  "Public."
+  OPEN
+  "An owner's claim was accepted."
+  CLAIMED
+  "Closed by its author, with a reason."
+  CLOSED
+  "Its 90 days ran out."
+  EXPIRED
+  "Taken down: out of every read."
+  REMOVED
+}
+
+enum CloseReason {
+  RECOVERED
+  GIVEN_UP
+  OTHER
+}
+
+"Where a found item is kept now."
+enum KeptAt {
+  "With the finder: its place is shown blurred."
+  WITH_FINDER
+  "At an organisation: a public place, shown exactly."
+  AT_ORGANISATION
+  "At a police station: a public place, shown exactly."
+  AT_POLICE
+}
+
+enum PhotoStatus {
+  "Not processed yet (an ID document's photo stays here until the blur slice)."
+  PENDING
+  "Processed: served by `/media/listing-photos/<key>/full`."
+  READY
+}
+
+"What an item looks like, as its author words it."
+type ListingAttributes {
+  colours: [String!]! @listSize(assumedSize: 5)
+  brand: String
+  marks: String
+}
+
+input ListingAttributesInput {
+  colours: [String!]! @constraint(maxItems: 5)
+  brand: String @constraint(minLength: 1, maxLength: 60)
+  marks: String @constraint(minLength: 1, maxLength: 300)
+}
+
+"A photo of the author's own listing: its media key, never a URL."
+type Photo {
+  "Read the bytes at `/media/listing-photos/<key>/full`."
+  key: ID!
+  status: PhotoStatus!
+}
+
+"The place of the author's own listing, as they gave it."
+type ListingPlace {
+  "Where it was lost or found, in words."
+  label: String!
+  point: GeoPoint!
+  "A lost item's area in metres, 200 to 20000; null for a found one."
+  radiusM: Int
+  "A found item's whereabouts; null for a lost one."
+  keptAt: KeptAt
+}
+
+"The place as a visitor sees it: a point blurred to about 110 m unless the item is kept in a public place."
+type PublicPlace {
+  "Where, in the author's words; null for an item kept with its finder, whose words could name their home, and for an ID document."
+  label: String
+  point: GeoPoint!
+  radiusM: Int
+  keptAt: KeptAt
+}
+
+"A question a claimant answers, with the answer the finder expects. The author's view only."
+type ListingQuestion {
+  prompt: String!
+  answer: String!
+}
+
+"""
+A listing as its author (or its organisation's agents) sees it: everything, the
+exact point and the expected answers included.
+"""
+type Listing {
+  id: ID!
+  kind: ListingKind!
+  countryCode: String!
+  categoryKey: String!
+  documentType: String
+  title: String!
+  description: String!
+  attributes: ListingAttributes!
+  photos: [Photo!]! @listSize(assumedSize: 5)
+  place: ListingPlace!
+  "The day it was lost or found."
+  date: Date!
+  questions: [ListingQuestion!]! @listSize(assumedSize: 3)
+  status: ListingStatus!
+  closedReason: CloseReason
+  closedAt: DateTime
+  publishedAt: DateTime
+  expiresAt: DateTime
+  "How many times it was extended, three at most."
+  extendedCount: Int!
+  "The slug of the organisation whose register holds it, if any."
+  organisationSlug: String
+  "Passed back to `updateListing` to lock the write."
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+A listing as a visitor sees it, masked: no author, no exact private point, no
+question or answer, no phone number, no original photo. For an ID document
+(`documentType` set) there is no free text and no photo until the blur slice:
+`title`, `description` and `attributes` are null and `photoKeys` empty.
+"""
+type PublicListing {
+  id: ID!
+  kind: ListingKind!
+  countryCode: String!
+  categoryKey: String!
+  documentType: String
+  title: String
+  description: String
+  attributes: ListingAttributes
+  "The processed photos, as media keys, at `/media/listing-photos/<key>/full`."
+  photoKeys: [ID!]! @listSize(assumedSize: 5)
+  place: PublicPlace!
+  date: Date!
+  status: ListingStatus!
+  publishedAt: DateTime
+  expiresAt: DateTime
+  organisationSlug: String
+}
+
+type ListingEdge {
+  node: Listing!
+}
+
+type ListingConnection {
+  edges: [ListingEdge!]! @listSize(assumedSize: 100)
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input ListingPlaceInput {
+  label: String! @constraint(minLength: 1, maxLength: 160)
+  point: GeoPointInput!
+  "Required for a lost item: 200 to 20000 metres. Refused for a found one."
+  radiusM: Int @constraint(min: 200, max: 20000)
+  "Required for a found item. Refused for a lost one."
+  keptAt: KeptAt
+}
+
+input ListingQuestionInput {
+  prompt: String! @constraint(minLength: 1, maxLength: 200)
+  answer: String! @constraint(minLength: 1, maxLength: 100)
+}
+
+"""
+What an author states of a listing: the same fields to declare it and to
+replace it (a field given is the new value).
+"""
+input ListingContentInput {
+  "An active country of `countries`."
+  countryCode: String! @constraint(pattern: "^[A-Z]{2}$")
+  "An active root category of `categories`."
+  categoryKey: String!
+    @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+  "Required for a document category, one of the country's document types; refused otherwise."
+  documentType: String
+    @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+  title: String! @constraint(minLength: 3, maxLength: 120)
+  description: String @constraint(maxLength: 2000)
+  attributes: ListingAttributesInput!
+  "Media keys of photos the author uploaded to `/media/listing-photos`, five at most, each on one listing."
+  photoKeys: [ID!]! @constraint(maxItems: 5)
+  place: ListingPlaceInput!
+  "Not in the future."
+  date: Date!
+  "A found item has one to three; a lost one none."
+  questions: [ListingQuestionInput!]! @constraint(maxItems: 3)
+}
+
+input DeclareListingInput {
+  kind: ListingKind!
+  content: ListingContentInput!
+  """
+  The slug of an organisation the author is an agent of: the listing joins its
+  register and its agents edit it. Needs an agent of it.
+  """
+  organisationSlug: String @constraint(minLength: 2, maxLength: 63)
+  "Publish at once; else a draft."
+  publish: Boolean! = false
+}
+
+extend type Query {
+  """
+  A listing a visitor may read, masked. Public. An unknown, draft, pending,
+  closed, expired or removed listing is `listings.errors.listing-not-found` (404).
+  """
+  listing(id: ID!): PublicListing!
+  """
+  The viewer's own listings, newest first, removed ones left out. Needs a
+  signed-in, unsuspended account.
+  """
+  myListings(
+    first: Int = 20 @constraint(min: 1, max: 100)
+    after: String
+  ): ListingConnection!
+  """
+  A listing as its author or its organisation's agents see it. Needs a
+  signed-in, unsuspended account; anybody else, and an unknown id, is
+  `listings.errors.listing-not-found` (404).
+  """
+  myListing(id: ID!): Listing!
+}
+
+extend type Mutation {
+  """
+  Declares a listing. Needs a signed-in, unsuspended account (an agent of
+  `organisationSlug`, else 404 `organisations.errors.organisation-not-found`).
+  Refusals: one `validation.errors.invalid-input` listing each field
+  (`listings.errors.category-invalid` on `categoryKey`,
+  `listings.errors.document-type-invalid` on `documentType`,
+  `listings.errors.photo-invalid` on `photoKeys.<i>`, the radius, the
+  whereabouts, the questions and the date), `config.errors.country-not-found`.
+  """
+  declareListing(input: DeclareListingInput!): Listing!
+  """
+  Replaces a draft, pending or open listing's content under `version`
+  (`listings.errors.stale-version` 409 when someone wrote first). `publish`
+  takes a draft public. Needs the author or an agent of its organisation;
+  `listings.errors.invalid-status` (409) for a listing past editing.
+  """
+  updateListing(
+    id: ID!
+    input: ListingContentInput!
+    version: Int!
+    publish: Boolean! = false
+  ): Listing!
+  """
+  Adds 90 days to an open listing, three times at most
+  (`listings.errors.extension-limit` 409). Needs the author or an agent.
+  """
+  extendListing(id: ID!): Listing!
+  """
+  Closes a listing for a reason. An ID document's photos are removed with it.
+  Needs the author or an agent; `listings.errors.invalid-status` (409).
+  """
+  closeListing(id: ID!, reason: CloseReason!): Listing!
+  "Takes a listing down for good, returning its id. Needs the author or an agent."
+  removeListing(id: ID!): ID!
+}

@@ -35,7 +35,7 @@ plugin's (`build-an-alxia-graphql-api`, `add-a-module`, its `conventions-reviewe
 `src/` has the entry points at its root (`server.ts`, `app.ts`, its spec) and a folder per
 concern: `config` (env, db, redis, sms, auth), `http` (context, schema, csrf, limits),
 `auth` (`auth.ts` janus, `access.ts`, `guards.ts`), `tenancy` (`scoped()`, the directory),
-`i18n` (the `ErrorCode` inventory), `sms` and `mail` (the ports' adapters), `shared`,
+`i18n` (the `ErrorCode` inventory), `sms`, `mail`, `geocoder` and `storage` (the ports' adapters), `shared`,
 `migrations` (with its `kit/`), `scripts` and `modules`. A module is `modules/<name>/`:
 flat for one entity, a folder per role (`graphql/`, `models/`, `services/`, `resolvers/`)
 for several, with `<name>.errors.ts` (+ spec), `.rules.ts`, `.utils.ts`, `.janus.ts` and an
@@ -68,7 +68,7 @@ of a service, a resolver or a data-loader: it goes to the module's `utils`, `rul
 
 ## Ports
 
-`SmsSender` (`src/sms`: the log adapter, Africa's Talking) and `Mailer` are passed explicitly
+`SmsSender` (`src/sms`: the log adapter, Africa's Talking), `Mailer`, `Geocoder` and the photos' `MediaBucket` (`src/storage`) are passed explicitly
 and never defaulted but by `createApp`, from the environment (`SMS_PROVIDER`; the log adapter is
 refused in production). A spec passes `memorySmsSender` (`test/sms.ts`) and the memory mailer.
 
@@ -108,3 +108,35 @@ is held in a SCREAMING_SNAKE_CASE constant. Assert `extensions.code`, never the 
   `config.errors.geocoding-unavailable`.
 - The seeded police stations are one central station per city at the city's centre: names and
   points are approximate and the platform admin completes them. No real person's data is seeded.
+
+## Listings and photos
+
+- `listings` and `listingUploads` (`src/modules/listings`) are platform data owned by their
+  author (`authorId`); `orgId` puts a listing in an organisation's register (its agents edit it)
+  and is not a tenant field. Who edits is `requireListingEditor` (`src/auth/guards.ts`): the author
+  or an agent of `orgId`; anybody else, and an unknown or removed listing, is the one 404
+  `listings.errors.listing-not-found`.
+- **Masked by default**: `Query.listing` returns `PublicListing` only, for an open or claimed
+  listing. No author, no question or answer, no phone, no original photo. A place is blurred to
+  three decimals (about 110 m) unless the item is kept at a police station or an organisation. For
+  an ID document (`documentType` set) the free text, the attributes and the photos are withheld
+  until the OCR and blur slice. `listings.schema.spec.ts` fixes what a visitor can reach and
+  `test/e2e/listings.leak.e2e.spec.ts` reads it as text.
+- Photos go through `@softistx/alxia-media` (`/media/listing-photos`, `src/http/media.ts`): the
+  only transport beside `/graphql`, over a private bucket (`S3_*`), a key never a URL, no presigned
+  URL. The upload is sniffed (jpeg, png, webp, 8 MB), decoded and re-encoded as one WebP of 1600 px at
+  most, which drops EXIF, GPS and XMP; the original is never stored. A listing carries only keys its
+  author uploaded (`listingUploads`), each once. `Photo.status` is settled after the write by the
+  background job (`PhotosService.settle`); a photo missing from the bucket is dropped.
+- Specs use `test/bucket.ts` (an in-memory bucket) and drawn pictures (`test/images.ts`), never a
+  real photo or ID image.
+- Writes of a listing replace its content whole (a field given is the new value) under `version`,
+  as the config module's do, rather than patching: the author's form always holds the whole. A
+  declaration reports the content's issues together; an unknown country is the one early refusal.
+- Until the Throttle port exists an account may upload thirty photos an hour; an upload never
+  attached to a listing is not swept yet (a later slice). A photo that fails to settle is retried
+  three times by the job and left pending (any later update of the listing settles it again); the
+  removal of an ID document's photos at close is tried three times per photo and a failure is
+  logged, the orphan sweep taking what remains.
+- A found item may be kept at an organisation only in that organisation's register; `AT_POLICE` is
+  the author's word until a safe place is linked to the listing.

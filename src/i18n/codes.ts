@@ -1,5 +1,6 @@
 import { codes as accounts } from "@/modules/accounts/accounts.errors";
 import { codes as config } from "@/modules/config/config.errors";
+import { codes as listings } from "@/modules/listings/listings.errors";
 import { codes as organisations } from "@/modules/organisations/organisations.errors";
 import { defineCodes } from "./define-codes";
 
@@ -32,6 +33,7 @@ export const errorCodes = [
   ...validation,
   ...accounts,
   ...config,
+  ...listings,
   ...organisations,
 ] as const;
 

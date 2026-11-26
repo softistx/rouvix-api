@@ -1,4 +1,9 @@
-export { codes } from "./config.errors";
+export { codes, countryNotFound } from "./config.errors";
+export {
+  fromGeoJson,
+  type GeoPoint,
+  toGeoJson,
+} from "./config.utils";
 export { configResolvers as config } from "./resolvers";
 export type {
   CategoryDocument,

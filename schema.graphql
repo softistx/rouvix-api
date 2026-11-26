@@ -169,6 +169,12 @@ input CategoryInput {
   parent: String @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
 }
 
+enum CloseReason {
+  GIVEN_UP
+  OTHER
+  RECOVERED
+}
+
 """A country the platform serves: configuration, not code."""
 type Country {
   """An inactive country is out of the public lists."""
@@ -231,6 +237,18 @@ scalar Date @specifiedBy(url: "https://www.rfc-editor.org/rfc/rfc3339#section-5.
 
 """An instant: an RFC 3339 date-time with its offset."""
 scalar DateTime @specifiedBy(url: "https://www.rfc-editor.org/rfc/rfc3339")
+
+input DeclareListingInput {
+  content: ListingContentInput!
+  kind: ListingKind!
+  """
+  The slug of an organisation the author is an agent of: the listing joins its
+  register and its agents edit it. Needs an agent of it.
+  """
+  organisationSlug: String @constraint(minLength: 2, maxLength: 63)
+  """Publish at once; else a draft."""
+  publish: Boolean! = false
+}
 
 """An ISO 8601 duration, such as P1DT2H or PT0.5S."""
 scalar Duration @specifiedBy(url: "https://www.iso.org/iso-8601-date-and-time-format.html")
@@ -391,6 +409,16 @@ scalar JWT @specifiedBy(url: "https://www.rfc-editor.org/rfc/rfc7519")
 """A KSUID: 27 characters of base62."""
 scalar KSUID @specifiedBy(url: "https://github.com/segmentio/ksuid")
 
+"""Where a found item is kept now."""
+enum KeptAt {
+  """At an organisation: a public place, shown exactly."""
+  AT_ORGANISATION
+  """At a police station: a public place, shown exactly."""
+  AT_POLICE
+  """With the finder: its place is shown blurred."""
+  WITH_FINDER
+}
+
 """The language of an account and of its messages."""
 enum Language {
   EN
@@ -399,6 +427,150 @@ enum Language {
 
 """A latitude in decimal degrees, from -90 to 90."""
 scalar Latitude
+
+"""
+A listing as its author (or its organisation's agents) sees it: everything, the
+exact point and the expected answers included.
+"""
+type Listing {
+  attributes: ListingAttributes!
+  categoryKey: String!
+  closedAt: DateTime
+  closedReason: CloseReason
+  countryCode: String!
+  createdAt: DateTime!
+  """The day it was lost or found."""
+  date: Date!
+  description: String!
+  documentType: String
+  expiresAt: DateTime
+  """How many times it was extended, three at most."""
+  extendedCount: Int!
+  id: ID!
+  kind: ListingKind!
+  """The slug of the organisation whose register holds it, if any."""
+  organisationSlug: String
+  photos: [Photo!]! @listSize(assumedSize: 5)
+  place: ListingPlace!
+  publishedAt: DateTime
+  questions: [ListingQuestion!]! @listSize(assumedSize: 3)
+  status: ListingStatus!
+  title: String!
+  updatedAt: DateTime!
+  """Passed back to `updateListing` to lock the write."""
+  version: Int!
+}
+
+"""What an item looks like, as its author words it."""
+type ListingAttributes {
+  brand: String
+  colours: [String!]! @listSize(assumedSize: 5)
+  marks: String
+}
+
+input ListingAttributesInput {
+  brand: String @constraint(minLength: 1, maxLength: 60)
+  colours: [String!]! @constraint(maxItems: 5)
+  marks: String @constraint(minLength: 1, maxLength: 300)
+}
+
+type ListingConnection {
+  edges: [ListingEdge!]! @listSize(assumedSize: 100)
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"""
+What an author states of a listing: the same fields to declare it and to
+replace it (a field given is the new value).
+"""
+input ListingContentInput {
+  attributes: ListingAttributesInput!
+  """An active root category of `categories`."""
+  categoryKey: String! @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+  """An active country of `countries`."""
+  countryCode: String! @constraint(pattern: "^[A-Z]{2}$")
+  """Not in the future."""
+  date: Date!
+  description: String @constraint(maxLength: 2000)
+  """
+  Required for a document category, one of the country's document types; refused otherwise.
+  """
+  documentType: String @constraint(minLength: 1, maxLength: 40, pattern: "^[A-Z][A-Z0-9_]*$")
+  """
+  Media keys of photos the author uploaded to `/media/listing-photos`, five at most, each on one listing.
+  """
+  photoKeys: [ID!]! @constraint(maxItems: 5)
+  place: ListingPlaceInput!
+  """A found item has one to three; a lost one none."""
+  questions: [ListingQuestionInput!]! @constraint(maxItems: 3)
+  title: String! @constraint(minLength: 3, maxLength: 120)
+}
+
+type ListingEdge {
+  node: Listing!
+}
+
+"""Whether a declaration is of an item lost or found."""
+enum ListingKind {
+  """Declared by whoever found it (a person, or an organisation's agent)."""
+  FOUND
+  """Declared by its owner, who looks for it."""
+  LOST
+}
+
+"""The place of the author's own listing, as they gave it."""
+type ListingPlace {
+  """A found item's whereabouts; null for a lost one."""
+  keptAt: KeptAt
+  """Where it was lost or found, in words."""
+  label: String!
+  point: GeoPoint!
+  """A lost item's area in metres, 200 to 20000; null for a found one."""
+  radiusM: Int
+}
+
+input ListingPlaceInput {
+  """Required for a found item. Refused for a lost one."""
+  keptAt: KeptAt
+  label: String! @constraint(minLength: 1, maxLength: 160)
+  point: GeoPointInput!
+  """
+  Required for a lost item: 200 to 20000 metres. Refused for a found one.
+  """
+  radiusM: Int @constraint(min: 200, max: 20000)
+}
+
+"""
+A question a claimant answers, with the answer the finder expects. The author's view only.
+"""
+type ListingQuestion {
+  answer: String!
+  prompt: String!
+}
+
+input ListingQuestionInput {
+  answer: String! @constraint(minLength: 1, maxLength: 100)
+  prompt: String! @constraint(minLength: 1, maxLength: 200)
+}
+
+"""Where a listing is in its life."""
+enum ListingStatus {
+  """An owner's claim was accepted."""
+  CLAIMED
+  """Closed by its author, with a reason."""
+  CLOSED
+  """Seen by its author only."""
+  DRAFT
+  """Its 90 days ran out."""
+  EXPIRED
+  """Public."""
+  OPEN
+  """Published, waiting for its photos to be processed: not public yet."""
+  PENDING
+  """Taken down: out of every read."""
+  REMOVED
+}
 
 """A date and a time with no offset, such as 2024-03-10T10:15:30."""
 scalar LocalDateTime
@@ -470,6 +642,11 @@ type Mutation {
   """
   acceptMembership(token: String! @constraint(minLength: 40, maxLength: 128)): OrganisationMembership!
   """
+  Closes a listing for a reason. An ID document's photos are removed with it.
+  Needs the author or an agent; `listings.errors.invalid-status` (409).
+  """
+  closeListing(id: ID!, reason: CloseReason!): Listing!
+  """
   Makes an organisation, its creator becoming its administrator. Needs a signed-in,
   unsuspended account. Refusals: `organisations.errors.slug-reserved` (400, on `slug`: the slug is one of the UI's own routes), `organisations.errors.slug-taken` (409, on `slug`).
   """
@@ -480,10 +657,25 @@ type Mutation {
   """
   createSafePlace(input: SafePlaceInput!): SafePlace!
   """
+  Declares a listing. Needs a signed-in, unsuspended account (an agent of
+  `organisationSlug`, else 404 `organisations.errors.organisation-not-found`).
+  Refusals: one `validation.errors.invalid-input` listing each field
+  (`listings.errors.category-invalid` on `categoryKey`,
+  `listings.errors.document-type-invalid` on `documentType`,
+  `listings.errors.photo-invalid` on `photoKeys.<i>`, the radius, the
+  whereabouts, the questions and the date), `config.errors.country-not-found`.
+  """
+  declareListing(input: DeclareListingInput!): Listing!
+  """
   Archives a safe place, returning its id. Needs the platform admin;
   `config.errors.safe-place-not-found` (404) for an unknown one.
   """
   deleteSafePlace(id: ID!): ID!
+  """
+  Adds 90 days to an open listing, three times at most
+  (`listings.errors.extension-limit` 409). Needs the author or an agent.
+  """
+  extendListing(id: ID!): Listing!
   """
   Invites a phone number as `role`, or sends a new invitation to a phone already
   invited. Needs an administrator (the refusals of `organisationMembers`); a
@@ -492,6 +684,10 @@ type Mutation {
   SMS: the token is returned.
   """
   inviteMember(phone: String! @constraint(minLength: 8, maxLength: 24), role: OrganisationRole!, slug: String! @constraint(minLength: 2, maxLength: 63)): InviteMemberPayload!
+  """
+  Takes a listing down for good, returning its id. Needs the author or an agent.
+  """
+  removeListing(id: ID!): ID!
   """
   Removes a member or withdraws an invitation, returning the member's id. Needs an
   administrator; the refusals of `setMemberRole`, `last-admin` for the last
@@ -518,6 +714,13 @@ type Mutation {
   for the last administrator being demoted.
   """
   setMemberRole(memberId: ID!, role: OrganisationRole!, slug: String! @constraint(minLength: 2, maxLength: 63)): Member!
+  """
+  Replaces a draft, pending or open listing's content under `version`
+  (`listings.errors.stale-version` 409 when someone wrote first). `publish`
+  takes a draft public. Needs the author or an agent of its organisation;
+  `listings.errors.invalid-status` (409) for a listing past editing.
+  """
+  updateListing(id: ID!, input: ListingContentInput!, publish: Boolean! = false, version: Int!): Listing!
   """
   Replaces a safe place's fields (stated whole). Needs the platform admin; the
   refusals of `createSafePlace`, `config.errors.safe-place-not-found` (404), and,
@@ -612,6 +815,22 @@ type PageInfo {
 """A phone number in E.164 form, such as +33612345678."""
 scalar PhoneNumber @specifiedBy(url: "https://www.itu.int/rec/T-REC-E.164")
 
+"""A photo of the author's own listing: its media key, never a URL."""
+type Photo {
+  """Read the bytes at `/media/listing-photos/<key>/full`."""
+  key: ID!
+  status: PhotoStatus!
+}
+
+enum PhotoStatus {
+  """
+  Not processed yet (an ID document's photo stays here until the blur slice).
+  """
+  PENDING
+  """Processed: served by `/media/listing-photos/<key>/full`."""
+  READY
+}
+
 """
 The roles an account holds over the platform. Every account is a `USER`; a
 platform admin is a `MODERATOR` too. A role in an organisation is an
@@ -638,6 +857,46 @@ scalar PositiveFloat
 
 """An integer from 1 to 2147483647."""
 scalar PositiveInt
+
+"""
+A listing as a visitor sees it, masked: no author, no exact private point, no
+question or answer, no phone number, no original photo. For an ID document
+(`documentType` set) there is no free text and no photo until the blur slice:
+`title`, `description` and `attributes` are null and `photoKeys` empty.
+"""
+type PublicListing {
+  attributes: ListingAttributes
+  categoryKey: String!
+  countryCode: String!
+  date: Date!
+  description: String
+  documentType: String
+  expiresAt: DateTime
+  id: ID!
+  kind: ListingKind!
+  organisationSlug: String
+  """
+  The processed photos, as media keys, at `/media/listing-photos/<key>/full`.
+  """
+  photoKeys: [ID!]! @listSize(assumedSize: 5)
+  place: PublicPlace!
+  publishedAt: DateTime
+  status: ListingStatus!
+  title: String
+}
+
+"""
+The place as a visitor sees it: a point blurred to about 110 m unless the item is kept in a public place.
+"""
+type PublicPlace {
+  keptAt: KeptAt
+  """
+  Where, in the author's words; null for an item kept with its finder, whose words could name their home, and for an ID document.
+  """
+  label: String
+  point: GeoPoint!
+  radiusM: Int
+}
 
 type Query {
   """
@@ -670,6 +929,22 @@ type Query {
   when the provider does not answer.
   """
   geocode(countryCode: String @constraint(pattern: "^[A-Z]{2}$"), first: Int = 5 @constraint(min: 1, max: 10), query: String! @constraint(minLength: 2, maxLength: 200)): [GeocodeResult!]! @listSize(assumedSize: 10)
+  """
+  A listing a visitor may read, masked. Public. An unknown, draft, pending,
+  closed, expired or removed listing is `listings.errors.listing-not-found` (404).
+  """
+  listing(id: ID!): PublicListing!
+  """
+  A listing as its author or its organisation's agents see it. Needs a
+  signed-in, unsuspended account; anybody else, and an unknown id, is
+  `listings.errors.listing-not-found` (404).
+  """
+  myListing(id: ID!): Listing!
+  """
+  The viewer's own listings, newest first, removed ones left out. Needs a
+  signed-in, unsuspended account.
+  """
+  myListings(after: String, first: Int = 20 @constraint(min: 1, max: 100)): ListingConnection!
   """
   An organisation the viewer works in. Needs an agent or an administrator of it:
   401 without a viewer, 403 `accounts.errors.suspended`, and 404

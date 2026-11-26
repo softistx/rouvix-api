@@ -35,6 +35,8 @@ const config: CodegenConfig = {
           Organisation: "@/modules/organisations#OrganisationDocument",
           Member: "@/modules/organisations#MemberDocument",
           // The config module's documents.
+          Listing: "@/modules/listings#ListingDocument",
+          PublicListing: "@/modules/listings#ListingDocument",
           Country: "@/modules/config#CountryDocument",
           Category: "@/modules/config#CategoryDocument",
           SafePlace: "@/modules/config#SafePlaceDocument",

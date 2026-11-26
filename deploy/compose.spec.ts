@@ -62,6 +62,8 @@ describe("the deploy compose file", () => {
       "REDIS_PASSWORD",
       "API_PROXY_SECRET",
       "AT_API_KEY",
+      "S3_ACCESS_KEY",
+      "S3_SECRET_KEY",
     ]) {
       expect(text).toContain(`\${${name}:?}`);
     }

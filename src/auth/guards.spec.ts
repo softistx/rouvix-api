@@ -3,6 +3,8 @@ import { ObjectId } from "mongodb";
 import { refusal } from "~/refusals";
 import type { Access, Viewer } from "./access";
 import {
+  editsOwned,
+  requireListingEditor,
   requireModerator,
   requireOrgAdmin,
   requireOrgAgent,
@@ -145,5 +147,73 @@ describe("a suspended account passes none", () => {
     expect(await codeOf(requireOrgAdmin(who, "mairie"))).toBe(expected);
     expect(await codeOf(requireModerator(who))).toBe(expected);
     expect(await codeOf(requirePlatformAdmin(who))).toBe(expected);
+  });
+});
+
+describe("requireListingEditor and editsOwned", () => {
+  const listing = (
+    authorId: string,
+    orgId: typeof organisation._id | null,
+  ) => ({ authorId, orgId });
+  const me = viewer();
+
+  test("its author edits it, an anonymous request is a 401", async () => {
+    const found = await requireListingEditor(ctx(me), async () =>
+      listing(me.id, null),
+    );
+    expect(found.listing.authorId).toBe(me.id);
+    expect(
+      await codeOf(
+        requireListingEditor(ctx(null), async () => listing(me.id, null)),
+      ),
+    ).toBe("auth.errors.unauthenticated");
+  });
+
+  test("a listing that is not there, and one of someone else's, are the same 404", async () => {
+    expect(
+      await codeOf(requireListingEditor(ctx(me), async () => undefined)),
+    ).toBe("listings.errors.listing-not-found");
+    expect(
+      await codeOf(
+        requireListingEditor(ctx(me), async () =>
+          listing("someone-else", null),
+        ),
+      ),
+    ).toBe("listings.errors.listing-not-found");
+    expect(
+      await statusOf(
+        requireListingEditor(ctx(me), async () =>
+          listing("someone-else", null),
+        ),
+      ),
+    ).toEqual({ status: 404 });
+  });
+
+  test("an agent of the listing's organisation edits it, an agent of another does not", async () => {
+    const agent = ctx(me, { isOrgAgent: true });
+    expect(
+      (
+        await requireListingEditor(agent, async () =>
+          listing("someone-else", organisation._id),
+        )
+      ).viewer,
+    ).toBe(me);
+    expect(
+      await editsOwned(ctx(me), me, listing("someone-else", organisation._id)),
+    ).toBe(false);
+    expect(await editsOwned(agent, me, listing("someone-else", null))).toBe(
+      false,
+    );
+  });
+
+  test("a suspended account edits nothing, not even its own", async () => {
+    const suspended = viewer(new Date());
+    expect(
+      await codeOf(
+        requireListingEditor(ctx(suspended), async () =>
+          listing(suspended.id, null),
+        ),
+      ),
+    ).toBe("accounts.errors.suspended");
   });
 });

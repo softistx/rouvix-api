@@ -1,3 +1,5 @@
+import type { ObjectId } from "mongodb";
+import type { Viewer } from "@/auth/access";
 import type { Context } from "@/http/context";
 import { fail } from "@/shared/errors";
 
@@ -66,4 +68,33 @@ export async function requirePlatformAdmin(ctx: GuardContext) {
     throw fail("auth.errors.forbidden", { status: 403 });
   }
   return viewer;
+}
+
+// Whether the viewer may edit something authored by `authorId` that may belong
+// to an organisation's register: its author, or an agent of that organisation.
+// The one place the rule is written; refuses nothing itself.
+export async function editsOwned(
+  ctx: Pick<GuardContext, "access">,
+  viewer: Viewer,
+  owned: { authorId: string; orgId: ObjectId | null },
+) {
+  return (
+    owned.authorId === viewer.id ||
+    (owned.orgId !== null && (await ctx.access.isOrgAgent(viewer, owned.orgId)))
+  );
+}
+
+// The listing `find` reads, when the viewer may edit it: `requireUser`'s
+// refusals, then 404 `listings.errors.listing-not-found` for a listing that
+// does not exist and for one the viewer may not edit alike. What every write
+// of a listing, and the author's own read of it, calls first.
+export async function requireListingEditor<
+  L extends { authorId: string; orgId: ObjectId | null },
+>(ctx: GuardContext, find: () => Promise<L | undefined>) {
+  const viewer = requireUser(ctx);
+  const listing = await find();
+  if (listing === undefined || !(await editsOwned(ctx, viewer, listing))) {
+    throw fail("listings.errors.listing-not-found", { status: 404 });
+  }
+  return { viewer, listing };
 }

@@ -82,12 +82,17 @@ describe("the collections", () => {
     expect(names).toEqual([
       "categories",
       "countries",
+      "listingUploads",
+      "listings",
       "members",
       "organisations",
       "safePlaces",
       "translations",
     ]);
     expect(isTenantOwned(collections.countries, "organisationId")).toBe(false);
+    // A listing's `orgId` is its register, not a tenant field: it is read by
+    // its author and by the register's agents through the guards.
+    expect(isTenantOwned(collections.listings, "organisationId")).toBe(false);
     expect(isTenantOwned(collections.safePlaces, "organisationId")).toBe(false);
     expect(isTenantOwned(collections.organisations, "organisationId")).toBe(
       false,

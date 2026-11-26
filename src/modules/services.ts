@@ -1,8 +1,10 @@
+import type { MediaBucket } from "@softistx/alxia-media";
 import type { Mailer } from "@softistx/mail";
 import type { Viewer } from "@/auth/access";
 import type { Auth } from "@/auth/auth";
 import type { AppMongo } from "@/config/db";
 import type { Geocoder } from "@/geocoder";
+import type { Background } from "@/shared/background";
 import type { Now } from "@/shared/dates";
 import type { SmsSender } from "@/sms";
 import { AccountsService } from "./accounts";
@@ -12,6 +14,7 @@ import {
   GeocodingService,
   SafePlacesService,
 } from "./config";
+import { ListingsService, PhotosService } from "./listings";
 import {
   MembersService,
   OrganisationRelations,
@@ -29,6 +32,9 @@ export interface ServiceDeps {
   mailer: Mailer;
   // The geocoding provider, passed explicitly and never defaulted.
   geocoder: Geocoder;
+  // The private bucket the photos live in, and where the photo job runs from.
+  media: MediaBucket;
+  background: Pick<Background, "run">;
 }
 
 // The services of one request, wired to each other and to their ports.
@@ -38,9 +44,19 @@ export function services(deps: ServiceDeps & { viewer: Viewer | null }) {
   const mongo = viewer ? rest.mongo.as(viewer.id) : rest.mongo;
   const relations = new OrganisationRelations(rest.auth);
   const countries = new CountriesService(mongo);
+  const categories = new CategoriesService(mongo);
+  const photos = new PhotosService(mongo, rest.media);
   return {
     countries,
-    categories: new CategoriesService(mongo),
+    categories,
+    photos,
+    listings: new ListingsService(mongo, {
+      countries,
+      categories,
+      photos,
+      now: rest.now,
+      background: rest.background,
+    }),
     safePlaces: new SafePlacesService(mongo, countries),
     geocoding: new GeocodingService(rest.geocoder),
     accounts: new AccountsService(rest.auth, {

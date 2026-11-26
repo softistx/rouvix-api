@@ -1,5 +1,6 @@
 import { health } from "@softistx/alxia";
 import { graphql } from "@softistx/alxia-graphql";
+import type { MediaBucket } from "@softistx/alxia-media";
 import type { Mailer } from "@softistx/mail";
 import { janusAccess, janusViewer } from "./auth/access";
 import type { Auth } from "./auth/auth";
@@ -7,11 +8,13 @@ import { serverAuth } from "./config/auth";
 import { mongo } from "./config/db";
 import { env } from "./config/env";
 import { serverGeocoder } from "./config/geocoder";
+import { serverMedia } from "./config/media";
 import { redis } from "./config/redis";
 import { serverSms } from "./config/sms";
 import type { Geocoder } from "./geocoder";
 import { type BaseOptions, createBase } from "./http/context";
 import { graphqlOptions, type ReportUnexpected } from "./http/graphql-endpoint";
+import { mediaApp } from "./http/media";
 import { noStoreMiddleware } from "./http/no-store";
 import { serverMailer } from "./mail/mailer";
 import { cataloguesLoaded } from "./modules/translations";
@@ -23,6 +26,7 @@ export type AppOptions = Partial<Omit<BaseOptions, "trusted">> & {
   auth?: Auth;
   sms?: SmsSender;
   geocoder?: Geocoder;
+  media?: MediaBucket;
   mailer?: Mailer;
   catalogues?: () => boolean;
   now?: Now;
@@ -37,27 +41,23 @@ export function createApp(options: AppOptions = {}) {
   const auth = options.auth ?? serverAuth();
   const sms = options.sms ?? serverSms();
   const geocoder = options.geocoder ?? serverGeocoder();
+  const media = options.media ?? serverMedia;
   const mailer = options.mailer ?? serverMailer(env.MAIL_URL);
   const cataloguesReady = options.catalogues ?? cataloguesLoaded;
   const now = options.now ?? (() => new Date());
+  const access = options.access ?? janusAccess(auth);
+  const deps = { mongo, auth, sms, mailer, geocoder, media, now };
   return createBase({
     resolveViewer: options.resolveViewer ?? janusViewer(auth),
-    access: options.access ?? janusAccess(auth),
+    access,
     organisations: options.organisations ?? organisationDirectory(mongo),
     trusted: env.TRUSTED_PROXIES,
     proxySecret: options.proxySecret ?? env.PROXY_SECRET,
   })
     .plugin(probes(cataloguesReady))
     .use("/graphql", noStoreMiddleware)
-    .plugin((app) =>
-      graphql(
-        app,
-        graphqlOptions(
-          { mongo, auth, sms, mailer, geocoder, now },
-          options.onUnexpected,
-        ),
-      ),
-    )
+    .plugin((app) => graphql(app, graphqlOptions(deps, options.onUnexpected)))
+    .plugin(mediaApp({ mongo, access, now }, media))
     .onStop(async () => {
       await mongo.close();
       await redis?.close();

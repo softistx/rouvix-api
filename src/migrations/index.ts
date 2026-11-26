@@ -7,6 +7,7 @@ import { categoriesSeed } from "./2026-11-26-categories.migration";
 import { configErrors } from "./2026-11-26-config-errors.migration";
 import { countriesSeed } from "./2026-11-26-countries.migration";
 import { safePlacesSeed } from "./2026-11-26-safe-places.migration";
+import { listingsErrors } from "./2026-11-27-listings-errors.migration";
 
 // The migrations `bun run db:migrate` applies, in EXECUTION order: the only
 // thing `migrate`, `rollback` and the boot check read. A new migration is
@@ -24,4 +25,5 @@ export const migrations: readonly Migration[] = [
   countriesSeed,
   safePlacesSeed,
   configErrors,
+  listingsErrors,
 ];
