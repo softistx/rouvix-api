@@ -86,9 +86,6 @@ x-api-env: &api-env
   # The geocoding provider's usage policy wants an identifying User-Agent with
   # a contact: set it in deploy/.env.
   GEOCODER_USER_AGENT: ${GEOCODER_USER_AGENT:?}
-  # The geocoding provider's usage policy wants an identifying User-Agent with
-  # a contact: set it in deploy/.env.
-  GEOCODER_USER_AGENT: ${GEOCODER_USER_AGENT:?}
 
 services:
   # ── data ────────────────────────────────────────────────────────────────────

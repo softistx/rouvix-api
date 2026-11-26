@@ -86,3 +86,19 @@ describe("the deploy compose file", () => {
     expect(text).not.toMatch(/\+237\s*6\s*\d/);
   });
 });
+
+describe("the compose files are valid YAML with no key twice", () => {
+  test("no environment variable is declared twice in a file", async () => {
+    for (const path of Object.values(files)) {
+      const text = await Bun.file(path).text();
+      const keys = [...text.matchAll(/^ {2}([A-Z][A-Z0-9_]+): /gm)].map(
+        (m) => m[1],
+      );
+      const seen = new Set<string>();
+      const twice = keys.filter((key) =>
+        seen.has(key as string) ? true : (seen.add(key as string), false),
+      );
+      expect(twice).toEqual([]);
+    }
+  });
+});
