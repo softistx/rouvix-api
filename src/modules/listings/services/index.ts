@@ -4,6 +4,7 @@ export {
   IdDocumentsService,
   type PhotoCheck,
 } from "./id-documents.service";
+export { ListingEmbeddings } from "./listing-embeddings.service";
 export { ListingMedia } from "./listing-media.service";
 export {
   type DeclareInput,

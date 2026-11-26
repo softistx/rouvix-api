@@ -5,7 +5,7 @@ import { jpegOf } from "~/images";
 import { documentContent, foundContent, listingsAs, photoOf } from "~/listings";
 import { fakeCniLines } from "~/ocr";
 import { refusal } from "~/refusals";
-import type { RemotePhoto } from "./ai.service";
+import type { RemotePhoto } from "./remote-photo-guard.service";
 
 // The gate of every call that would send a photo off the VPS (AGENTS.md, "ID
 // documents never leave the VPS"): a spy stands for the remote service, and

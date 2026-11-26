@@ -1,6 +1,18 @@
-export { aiUnavailable, codes, documentPhoto } from "./ai.errors";
 export {
+  aiUnavailable,
+  codes,
+  documentPhoto,
+  photoNotFound,
+} from "./ai.errors";
+export { embeddingRanker } from "./ai.ranking";
+export { aiResolvers as ai } from "./resolvers";
+export {
+  type EmbeddingDeps,
+  EmbeddingsService,
+  type ObjectSuggestion,
   type RemotePhoto,
   type RemotePhotoDeps,
   RemotePhotoGuard,
-} from "./ai.service";
+  SuggestionsService,
+  UsageService,
+} from "./services";

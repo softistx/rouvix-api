@@ -4,6 +4,7 @@ import type { MediaBucket } from "@softistx/alxia-media";
 import type { Mailer } from "@softistx/mail";
 import { janusAccess, janusViewer } from "./auth/access";
 import type { Auth } from "./auth/auth";
+import { serverDescriber, serverEmbedder } from "./config/ai";
 import { serverAuth } from "./config/auth";
 import { mongo } from "./config/db";
 import { env } from "./config/env";
@@ -17,12 +18,16 @@ import { serverMedia } from "./config/media";
 import { redis } from "./config/redis";
 import { serverSms } from "./config/sms";
 import { serverThrottle } from "./config/throttle";
+import type { ObjectDescriber } from "./describer";
+import type { Embedder } from "./embedder";
 import type { Geocoder } from "./geocoder";
 import { type BaseOptions, createBase } from "./http/context";
 import { graphqlOptions, type ReportUnexpected } from "./http/graphql-endpoint";
 import { mediaApp } from "./http/media";
 import { noStoreMiddleware } from "./http/no-store";
 import { serverMailer } from "./mail/mailer";
+import { embeddingRanker } from "./modules/ai";
+import { ListingEmbeddings } from "./modules/listings";
 import { type ListingRanker, textRanker } from "./modules/search";
 import { cataloguesLoaded } from "./modules/translations";
 import type { Ocr } from "./ocr";
@@ -37,6 +42,9 @@ export type AppOptions = Partial<Omit<BaseOptions, "trusted">> & {
   sms?: SmsSender;
   geocoder?: Geocoder;
   ranker?: ListingRanker;
+  describer?: ObjectDescriber;
+  embedder?: Embedder;
+  claudeDailyCap?: number;
   media?: MediaBucket;
   ocr?: Ocr;
   redactor?: ImageRedactor;
@@ -49,13 +57,22 @@ export type AppOptions = Partial<Omit<BaseOptions, "trusted">> & {
 
 // The app's entry point, where the ports are defaulted to the server's own
 // (janus for the viewer and its access, the SMS adapter and the mailer chosen
-// by the environment, the local OCR, blur and vault of the ID documents) so a
+// by the environment, the local OCR, blur and vault of the ID documents, Claude's
+// describer and the local embedder) so a
 // spec injects only what it fakes. Everything below receives them explicitly.
 export function createApp(options: AppOptions = {}) {
   const auth = options.auth ?? serverAuth();
   const sms = options.sms ?? serverSms();
   const geocoder = options.geocoder ?? serverGeocoder();
-  const ranker = options.ranker ?? textRanker;
+  const embedder = options.embedder ?? serverEmbedder();
+  const describer = options.describer ?? serverDescriber();
+  const ranker =
+    options.ranker ??
+    embeddingRanker({
+      embedder,
+      vectorsOf: (ids, model) => new ListingEmbeddings(mongo).of(ids, model),
+      fallback: textRanker,
+    });
   const media = options.media ?? serverMedia;
   const ocr = options.ocr ?? serverOcr();
   const redactor = options.redactor ?? serverRedactor();
@@ -75,6 +92,9 @@ export function createApp(options: AppOptions = {}) {
     redactor,
     vault,
     ranker,
+    describer,
+    embedder,
+    claudeDailyCap: options.claudeDailyCap ?? env.CLAUDE_DAILY_CAP,
     now,
   };
   return createBase({

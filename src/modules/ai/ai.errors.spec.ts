@@ -1,11 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import { aiUnavailable, codes, documentPhoto } from "./ai.errors";
+import {
+  aiUnavailable,
+  codes,
+  documentPhoto,
+  photoNotFound,
+} from "./ai.errors";
 
 describe("codes", () => {
   test("are the module's, each under `ai.errors.`", () => {
     expect(codes).toEqual([
       "ai.errors.document-photo",
       "ai.errors.unavailable",
+      "ai.errors.photo-not-found",
     ]);
   });
 });
@@ -19,6 +25,10 @@ describe("refusals", () => {
     expect(aiUnavailable().extensions).toMatchObject({
       code: "ai.errors.unavailable",
       http: { status: 503 },
+    });
+    expect(photoNotFound().extensions).toMatchObject({
+      code: "ai.errors.photo-not-found",
+      http: { status: 404 },
     });
   });
 });

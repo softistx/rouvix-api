@@ -1,6 +1,7 @@
-import type { MediaBucket } from "@softistx/alxia-media";
+import { type MediaBucket, mediaObjectKey } from "@softistx/alxia-media";
 import type { AppMongo } from "@/config/db";
 import { locked } from "../listings.errors";
+import { PHOTO_FULL, PHOTO_KIND } from "../listings.media";
 import {
   blurredKeysOf,
   blurredObjectKey,
@@ -26,6 +27,26 @@ export class PhotosService {
     private readonly pause: (ms: number) => Promise<void> = (ms) =>
       new Promise((resolve) => setTimeout(resolve, ms)),
   ) {}
+
+  // The bytes of a photo the account uploaded (its stored rendition, a WebP),
+  // for the one call that sends an object's photo off the VPS, through the
+  // guard of src/modules/ai: undefined for a key the account did not upload, or
+  // whose object is not there.
+  async uploadedBytes(
+    accountId: string,
+    key: string,
+  ): Promise<Uint8Array | undefined> {
+    const upload = await this.mongo.db.listingUploads.findById(key);
+    if (upload === undefined || upload.accountId !== accountId) {
+      return undefined;
+    }
+    const opened = await this.bucket.open(
+      { key: mediaObjectKey(PHOTO_KIND, key, PHOTO_FULL) },
+      { timeoutMs: TIMEOUT_MS },
+    );
+    if (opened === undefined) return undefined;
+    return new Uint8Array(await new Response(opened.stream).arrayBuffer());
+  }
 
   // Settles a listing's photos, as the background job after a publish does:
   // each pending photo goes through the ID document pipeline (read by the

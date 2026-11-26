@@ -8,6 +8,7 @@ import { clientHeader } from "@/http/csrf";
 import { localRedactor } from "@/redactor";
 import type { Throttle } from "@/throttle";
 import { ephemeralIdVault } from "@/vault";
+import { fakeClaude, fakeOllama } from "~/ai";
 import { memoryBucket } from "~/bucket";
 import { fakeGeocoder } from "~/geocoder";
 import { fakeOcr } from "~/ocr";
@@ -25,6 +26,8 @@ export function authApp(options: { throttle?: Throttle } = {}) {
   const geocoder = fakeGeocoder();
   const storage = memoryBucket();
   const ocr = fakeOcr();
+  const claude = fakeClaude();
+  const ollama = fakeOllama();
   const redactor = localRedactor();
   const vault = ephemeralIdVault();
   const auth = createAuth({
@@ -41,6 +44,8 @@ export function authApp(options: { throttle?: Throttle } = {}) {
     ocr,
     redactor,
     vault,
+    describer: claude.describer,
+    embedder: ollama.embedder,
     ...(options.throttle && { throttle: options.throttle }),
     now: () => new Date(clock.now()),
   });
@@ -63,6 +68,8 @@ export function authApp(options: { throttle?: Throttle } = {}) {
     geocoder,
     storage,
     ocr,
+    claude,
+    ollama,
     redactor,
     vault,
     clock,

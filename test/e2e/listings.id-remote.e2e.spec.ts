@@ -132,7 +132,10 @@ describe("an ID document's photo, in the code", () => {
     expect(found).toEqual([]);
   });
 
-  test("no source imports a provider SDK, and the house AI SDK only behind the gate", async () => {
+  test("no source imports a provider SDK, and the house AI SDK only in the AI adapters", async () => {
+    // The describer and the embedder ports with the server's choice of their
+    // adapters (src/config/ai.ts), and the ai module's own files.
+    const allowed = ["src/modules/ai/", "src/describer/", "src/embedder/"];
     const found: string[] = [];
     for (const path of await sources(["src/**/*.ts"])) {
       for (const from of await importsOf(path)) {
@@ -140,12 +143,31 @@ describe("an ID document's photo, in the code", () => {
         const ai = from.startsWith("@softistx/ai-");
         if (
           provider.test(from) ||
-          (ai && !path.startsWith("src/modules/ai/"))
+          (ai &&
+            path !== "src/config/ai.ts" &&
+            !allowed.some((prefix) => path.startsWith(prefix)))
         ) {
           found.push(`${path}: ${from}`);
         }
       }
     }
     expect(found).toEqual([]);
+  });
+
+  test("Claude is reached through the remote photo guard and nothing else", async () => {
+    // `ObjectDescriber.describe` is called by one file, whose call sits in the
+    // guard's callback; the Anthropic adapter is built by the server's config
+    // and by nothing else.
+    const callers: string[] = [];
+    const adapters: string[] = [];
+    for (const path of await sources(["src/**/*.ts", "test/**/*.ts"])) {
+      const text = await Bun.file(path).text();
+      if (/\bdescriber\.describe\(/.test(text)) callers.push(path);
+      if (/from "@softistx\/ai-anthropic"/.test(text)) adapters.push(path);
+    }
+    expect(callers).toEqual(["src/modules/ai/services/suggestions.service.ts"]);
+    expect(adapters).toEqual(["src/config/ai.ts"]);
+    const service = await Bun.file(callers[0] as string).text();
+    expect(service).toMatch(/guard\.send\(/);
   });
 });

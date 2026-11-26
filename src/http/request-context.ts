@@ -3,6 +3,8 @@ import type { Mailer } from "@softistx/mail";
 import type { Viewer } from "../auth/access";
 import type { Auth } from "../auth/auth";
 import type { AppMongo } from "../config/db";
+import type { ObjectDescriber } from "../describer";
+import type { Embedder } from "../embedder";
 import type { Geocoder } from "../geocoder";
 import { services } from "../modules";
 import type { ListingRanker } from "../modules/search";
@@ -25,6 +27,9 @@ export interface ContextDeps {
   redactor: ImageRedactor;
   vault: IdVault;
   ranker: ListingRanker;
+  describer: ObjectDescriber;
+  embedder: Embedder;
+  claudeDailyCap: number;
   now: Now;
 }
 

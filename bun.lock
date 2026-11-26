@@ -8,6 +8,9 @@
         "@graphql-tools/load-files": "^7.0.1",
         "@graphql-tools/merge": "^9.2.6",
         "@graphql-tools/utils": "^12.0.3",
+        "@softistx/ai-anthropic": "^0.6.0",
+        "@softistx/ai-core": "^0.9.0",
+        "@softistx/ai-ollama": "^0.5.0",
         "@softistx/alxia": "^0.28.0",
         "@softistx/alxia-env": "^0.6.0",
         "@softistx/alxia-graphql": "^0.20.1",
@@ -37,6 +40,7 @@
         "@graphql-codegen/typescript": "6.1.1",
         "@graphql-codegen/typescript-resolvers": "6.1.1",
         "@graphql-typed-document-node/core": "^3.2.0",
+        "@softistx/ai-testing": "^0.4.0",
         "@softistx/graphql-codegen-zod": "^0.6.0",
         "@types/bun": "^1.4.5",
         "@types/nodemailer": "^8.0.2",
@@ -251,6 +255,14 @@
     "@nxgt/zod": ["@nxgt/zod@0.2.0", "", { "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0", "zod": ">=4.6.5 <5" } }, "sha512-+KwQg+aex1loT6CzeUT0s4WipC/dxemQota8oVft404NfBtopJY3Um9vlydctEdhV9T/RoP5+B9+CUpmcoiGXg=="],
 
     "@repeaterjs/repeater": ["@repeaterjs/repeater@3.1.0", "", {}, "sha512-TaoVksZRSx2KWYYpyLQtMQXXeS98VsgZImzW65xmiVgbYhXLk+aEsmzPLirqVuE4/XuUapH2iMtxUzaBNDzdSQ=="],
+
+    "@softistx/ai-anthropic": ["@softistx/ai-anthropic@0.6.0", "", { "peerDependencies": { "@softistx/ai-core": "^0.9.0", "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-Blem+HJpShEUo6fljExttSDTek5kxyBwYb1psrfRIqfluvWxH3pkdQGfwc/VUbhthfElHxANOb9yS58yys6ipw=="],
+
+    "@softistx/ai-core": ["@softistx/ai-core@0.9.0", "", { "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0", "zod": ">=4.6.5 <5" } }, "sha512-GhX91hYWNHildPio7EJE2T4R0iN6eQsSFe1u9BGvlpXw4rTj5yVQ1xKwfW1aD7dWgTB4M8cxPKPISycxaw13Ag=="],
+
+    "@softistx/ai-ollama": ["@softistx/ai-ollama@0.5.0", "", { "peerDependencies": { "@softistx/ai-core": "^0.9.0", "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-F8QYXlHY+wwkHfYqTVOECKpzXq/QoyfExZG3UG4i59CzmJpSxROCMRxcEMlcpD378Mvl9FLkKsJ3GOEHjKzo/Q=="],
+
+    "@softistx/ai-testing": ["@softistx/ai-testing@0.4.0", "", { "peerDependencies": { "@softistx/ai-core": "^0.9.0", "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-eQgFI5ivITmiSGRTOSpx5Rs3XXc9Oh/hyw5+vr0DYp73v4ZG06dzzOe6yFwaatXa8nazwNBj6m5jbgAtUxFkEA=="],
 
     "@softistx/alxia": ["@softistx/alxia@0.28.0", "", { "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-mCeH9B14Bvu/H8zOGpEVZjlKs6Lsi1POUKruCD8O0EDo7ADOOy0+B0uZa28oMlbOxpUClqDndfY8KDLHS7/jrQ=="],
 

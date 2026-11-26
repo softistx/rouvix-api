@@ -1,6 +1,7 @@
 import type { MediaBucket } from "@softistx/alxia-media";
 import { viewerOf } from "@/auth/access";
 import { mongo } from "@/config/db";
+import type { Embedder } from "@/embedder";
 import { services } from "@/modules";
 import { CountriesService } from "@/modules/config";
 import {
@@ -16,7 +17,11 @@ import { jpegOf } from "~/images";
 
 // The services of one request as the viewer `n` (a fake Cameroon number), over
 // the test kit's ports and in-memory bucket.
-export async function listingsAs(kit: AuthApp, n = 1) {
+export async function listingsAs(
+  kit: AuthApp,
+  n = 1,
+  options: { claudeDailyCap?: number; embedder?: Embedder } = {},
+) {
   const person = await signedIn(kit, { phone: fakeE164(n) });
   const viewer = viewerOf(person.account);
   const all = services({
@@ -31,6 +36,9 @@ export async function listingsAs(kit: AuthApp, n = 1) {
     redactor: kit.redactor,
     vault: kit.vault,
     ranker: textRanker,
+    describer: kit.claude.describer,
+    embedder: options.embedder ?? kit.ollama.embedder,
+    claudeDailyCap: options.claudeDailyCap ?? 50,
     background: kit.auth.background,
     viewer,
   });

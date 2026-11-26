@@ -118,4 +118,34 @@ describe("env", () => {
       parsed({ ID_FIELDS_KEY: Buffer.alloc(16).toString("base64") }),
     ).rejects.toThrow();
   });
+
+  test("Claude is optional, with the newest model and a daily cap", async () => {
+    const none = await parsed({
+      ANTHROPIC_API_KEY: undefined,
+      ANTHROPIC_MODEL: undefined,
+      CLAUDE_DAILY_CAP: undefined,
+    });
+    expect(none.env.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(none.env.ANTHROPIC_MODEL).toBe("claude-sonnet-5-5");
+    expect(none.env.CLAUDE_DAILY_CAP).toBe(200);
+    const set = await parsed({
+      ANTHROPIC_API_KEY: "sk-fake-for-specs",
+      CLAUDE_DAILY_CAP: "0",
+    });
+    expect(set.env.ANTHROPIC_API_KEY).toBe("sk-fake-for-specs");
+    expect(set.env.CLAUDE_DAILY_CAP).toBe(0);
+    await expect(parsed({ CLAUDE_DAILY_CAP: "-1" })).rejects.toThrow();
+  });
+
+  test("Ollama is a private service only, or unset", async () => {
+    const local = await parsed({ OLLAMA_URL: "http://rouvix-ollama:11434/" });
+    expect(local.env.OLLAMA_URL).toBe("http://rouvix-ollama:11434");
+    expect((await parsed({ OLLAMA_URL: undefined })).env.OLLAMA_URL).toBe(
+      undefined,
+    );
+    expect((await parsed({ OLLAMA_URL: "" })).env.OLLAMA_URL).toBeUndefined();
+    await expect(
+      parsed({ OLLAMA_URL: "https://ollama.example.com" }),
+    ).rejects.toThrow();
+  });
 });
