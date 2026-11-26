@@ -40,6 +40,11 @@ export const Account = z.object({
   trustScore: z.number().int().min(0).max(100).default(50),
   finderBadge: z.boolean().default(false),
   suspendedAt: z.iso.datetime().nullable().default(null),
+  // The e-mail copies of the notices (spec §5.6) go to `email` only once
+  // `emailVerifiedAt` is set. The address's own proof (request, confirm) is the
+  // sign-in's (spec §5.1) and sets the two; changing the address clears the date.
+  email: z.email().nullable().default(null),
+  emailVerifiedAt: z.iso.datetime().nullable().default(null),
 });
 
 // Janus, wired for rouvix: one account type, whose sessions are read from

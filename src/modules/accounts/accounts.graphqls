@@ -30,6 +30,14 @@ type Account {
   finderBadge: Boolean!
   "When a moderator suspended the account; null when it is not. A suspended account passes no guard (`accounts.errors.suspended`)."
   suspendedAt: DateTime
+  """
+  The account's own e-mail address, once one is saved. Shown to its holder
+  only, like the phone; never public. The notices' e-mail copies go to it when
+  it is verified (spec §5.6).
+  """
+  email: EmailAddress
+  "Whether the address was proved (spec §5.1: the sign-in sets it)."
+  emailVerified: Boolean!
   createdAt: DateTime!
 }
 

@@ -39,6 +39,14 @@ const redisUrl = z
 
 const secret = z.string().min(32, "at least 32 characters");
 
+// Optional, all or none (checked below): an unset or empty value is unset.
+const optional = (schema: z.ZodType<string, string>) =>
+  z
+    .string()
+    .transform((value) => value || undefined)
+    .pipe(schema.optional())
+    .optional();
+
 // Checked once, when this module is first imported: a malformed variable stops
 // the process, with every issue, before it listens.
 const parsed = defineEnv({
@@ -190,6 +198,15 @@ const parsed = defineEnv({
         "not 32 bytes in base64",
       ),
   ),
+  // Web Push's VAPID keys (RFC 8292), all or none: a P-256 public key (65
+  // bytes, base64url, the one rouvix-ui's browsers subscribe with), its private
+  // key (32 bytes, base64url, never returned or logged) and the contact push
+  // services may write to (`mailto:` or `https:`). None: push is off.
+  VAPID_PUBLIC_KEY: optional(z.string().regex(/^[A-Za-z0-9_-]{87}$/)),
+  VAPID_PRIVATE_KEY: optional(z.string().regex(/^[A-Za-z0-9_-]{43}$/)),
+  VAPID_SUBJECT: optional(
+    z.string().regex(/^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s/]+.*)$/),
+  ),
 });
 
 const s3Required = [
@@ -202,6 +219,18 @@ const s3Missing = s3Required.filter((name) => parsed[name] === undefined);
 if (s3Missing.length > 0 && s3Missing.length < s3Required.length) {
   throw new Error(
     `S3_* is incomplete: ${s3Missing.join(", ")} unset. Set all of ${s3Required.join(", ")}, or none for no file storage.`,
+  );
+}
+
+const vapid = [
+  "VAPID_PUBLIC_KEY",
+  "VAPID_PRIVATE_KEY",
+  "VAPID_SUBJECT",
+] as const;
+const vapidMissing = vapid.filter((name) => parsed[name] === undefined);
+if (vapidMissing.length > 0 && vapidMissing.length < vapid.length) {
+  throw new Error(
+    `VAPID_* is incomplete: ${vapidMissing.join(", ")} unset. Set all of ${vapid.join(", ")}, or none for no Web Push.`,
   );
 }
 

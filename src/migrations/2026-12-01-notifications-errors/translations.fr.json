@@ -1,0 +1,4 @@
+{
+  "notifications.errors.notification-not-found": "Cette notification n'existe pas.",
+  "notifications.errors.push-unavailable": "Les notifications push ne sont pas disponibles pour le moment. Vous retrouverez vos notifications dans l'application."
+}

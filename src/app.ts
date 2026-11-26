@@ -15,6 +15,7 @@ import {
   serverRedactor,
 } from "./config/id-documents";
 import { serverMedia } from "./config/media";
+import { serverPush } from "./config/push";
 import { redis } from "./config/redis";
 import { serverSms } from "./config/sms";
 import { serverThrottle } from "./config/throttle";
@@ -31,6 +32,7 @@ import { ListingEmbeddings } from "./modules/listings";
 import { type ListingRanker, textRanker } from "./modules/search";
 import { cataloguesLoaded } from "./modules/translations";
 import type { Ocr } from "./ocr";
+import type { PushSender } from "./push";
 import type { ImageRedactor } from "./redactor";
 import type { Now } from "./shared/dates";
 import type { SmsSender } from "./sms";
@@ -50,6 +52,7 @@ export type AppOptions = Partial<Omit<BaseOptions, "trusted">> & {
   redactor?: ImageRedactor;
   vault?: IdVault;
   mailer?: Mailer;
+  push?: PushSender;
   catalogues?: () => boolean;
   now?: Now;
   onUnexpected?: ReportUnexpected;
@@ -78,6 +81,7 @@ export function createApp(options: AppOptions = {}) {
   const redactor = options.redactor ?? serverRedactor();
   const vault = options.vault ?? serverIdVault();
   const mailer = options.mailer ?? serverMailer(env.MAIL_URL);
+  const push = options.push ?? serverPush();
   const cataloguesReady = options.catalogues ?? cataloguesLoaded;
   const now = options.now ?? (() => new Date());
   const access = options.access ?? janusAccess(auth);
@@ -86,6 +90,8 @@ export function createApp(options: AppOptions = {}) {
     auth,
     sms,
     mailer,
+    push,
+    mail: { from: env.MAIL_FROM, uiUrl: env.UI_URL },
     geocoder,
     media,
     ocr,

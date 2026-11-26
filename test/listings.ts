@@ -30,6 +30,8 @@ export async function listingsAs(
     now: () => new Date(kit.clock.now()),
     sms: kit.sms,
     mailer: kit.mailer,
+    push: kit.push,
+    mail: { from: "no-reply@rouvix.test", uiUrl: "http://localhost:5173" },
     geocoder: kit.geocoder,
     media: kit.storage.bucket,
     ocr: kit.ocr,

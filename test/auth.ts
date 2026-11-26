@@ -12,6 +12,7 @@ import { fakeClaude, fakeOllama } from "~/ai";
 import { memoryBucket } from "~/bucket";
 import { fakeGeocoder } from "~/geocoder";
 import { fakeOcr } from "~/ocr";
+import { fakePush } from "~/push";
 import { memorySmsSender } from "~/sms";
 
 // The app with the REAL janus, its stores in the test database: a memory
@@ -23,6 +24,7 @@ export function authApp(options: { throttle?: Throttle } = {}) {
   const clock = fixedClock(Date.now());
   const mailer = createMemoryMailer();
   const sms = memorySmsSender();
+  const push = fakePush();
   const geocoder = fakeGeocoder();
   const storage = memoryBucket();
   const ocr = fakeOcr();
@@ -39,6 +41,7 @@ export function authApp(options: { throttle?: Throttle } = {}) {
     auth,
     sms,
     mailer,
+    push,
     geocoder,
     media: storage.bucket,
     ocr,
@@ -65,6 +68,7 @@ export function authApp(options: { throttle?: Throttle } = {}) {
     app,
     mailer,
     sms,
+    push,
     geocoder,
     storage,
     ocr,

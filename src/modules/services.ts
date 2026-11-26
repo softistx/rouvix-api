@@ -7,6 +7,7 @@ import type { ObjectDescriber } from "@/describer";
 import type { Embedder } from "@/embedder";
 import type { Geocoder } from "@/geocoder";
 import type { Ocr } from "@/ocr";
+import type { PushSender } from "@/push";
 import type { ImageRedactor } from "@/redactor";
 import type { Background } from "@/shared/background";
 import type { Now } from "@/shared/dates";
@@ -31,6 +32,12 @@ import {
   ListingsService,
   PhotosService,
 } from "./listings";
+import {
+  NoticesService,
+  NotifyService,
+  PushSubscriptions,
+  SettingsService,
+} from "./notifications";
 import {
   MembersService,
   OrganisationRelations,
@@ -65,6 +72,10 @@ export interface ServiceDeps {
   claudeDailyCap: number;
   // How a text search puts its matches in order, passed explicitly.
   ranker: ListingRanker;
+  // Web Push (spec §5.6), passed explicitly, and what an e-mail copy needs: the
+  // address mails leave from and the UI's base URL its links start with.
+  push: PushSender;
+  mail: { from: string; uiUrl: string };
 }
 
 // The services of one request, wired to each other and to their ports.
@@ -111,7 +122,25 @@ export function services(deps: ServiceDeps & { viewer: Viewer | null }) {
     idPhoto: (key) => listings.isIdPhoto(key),
     now: rest.now,
   });
+  const notices = new NoticesService(mongo, rest.now);
+  const settings = new SettingsService(mongo, rest.auth);
+  const subscriptions = new PushSubscriptions(mongo, rest.push.available);
   return {
+    notices,
+    settings,
+    subscriptions,
+    // The one door the later slices call to tell an account something.
+    notifier: new NotifyService({
+      auth: rest.auth,
+      notices,
+      settings,
+      subscriptions,
+      push: rest.push,
+      mailer: rest.mailer,
+      background: rest.background,
+      listing: (id) => listings.find(id.toHexString()),
+      mail: rest.mail,
+    }),
     countries,
     categories,
     photos,

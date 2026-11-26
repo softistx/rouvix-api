@@ -42,3 +42,6 @@ afterAll(async () => {
   await mongo.close();
   await replSet.stop();
 }, 60_000);
+delete Bun.env["VAPID_PUBLIC_KEY"];
+delete Bun.env["VAPID_PRIVATE_KEY"];
+delete Bun.env["VAPID_SUBJECT"];

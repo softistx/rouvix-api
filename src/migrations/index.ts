@@ -13,6 +13,7 @@ import { throttleErrors } from "./2026-11-28-throttle-errors.migration";
 import { aiErrors } from "./2026-11-29-ai-errors.migration";
 import { listingsIdFields } from "./2026-11-29-listings-id-fields.migration";
 import { aiObjectsErrors } from "./2026-11-30-ai-objects-errors.migration";
+import { notificationsErrors } from "./2026-12-01-notifications-errors.migration";
 
 // The migrations `bun run db:migrate` applies, in EXECUTION order: the only
 // thing `migrate`, `rollback` and the boot check read. A new migration is
@@ -36,4 +37,5 @@ export const migrations: readonly Migration[] = [
   aiErrors,
   listingsIdFields,
   aiObjectsErrors,
+  notificationsErrors,
 ];

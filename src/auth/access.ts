@@ -14,6 +14,9 @@ export interface Viewer {
   trustScore: number;
   finderBadge: boolean;
   suspendedAt: Date | null;
+  // The account's own address, and when it was proved (spec §5.1).
+  email: string | null;
+  emailVerifiedAt: Date | null;
   createdAt: Date;
   // When the request's session ends, after any renewal this request made; null
   // when no session was read (a fake in a spec).
@@ -83,6 +86,8 @@ export const viewerOf = (
     trustScore: number;
     finderBadge: boolean;
     suspendedAt: string | null;
+    email: string | null;
+    emailVerifiedAt: string | null;
     createdAt: Date;
   },
   session?: { expiresAt: Date },
@@ -96,6 +101,9 @@ export const viewerOf = (
   trustScore: user.trustScore,
   finderBadge: user.finderBadge,
   suspendedAt: user.suspendedAt === null ? null : new Date(user.suspendedAt),
+  email: user.email,
+  emailVerifiedAt:
+    user.emailVerifiedAt === null ? null : new Date(user.emailVerifiedAt),
   createdAt: user.createdAt,
   sessionExpiresAt: session?.expiresAt ?? null,
 });

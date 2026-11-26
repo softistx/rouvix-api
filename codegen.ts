@@ -42,6 +42,9 @@ const config: CodegenConfig = {
           Country: "@/modules/config#CountryDocument",
           Category: "@/modules/config#CategoryDocument",
           SafePlace: "@/modules/config#SafePlaceDocument",
+          // A notice from its document; the settings as the service views them.
+          Notification: "@/modules/notifications#NotificationDocument",
+          Settings: "@/modules/notifications#SettingsView",
           // The error catalogue of a language: its version, the messages read
           // when selected; a message as the catalogue holds it.
           ErrorCatalogue: "@/modules/translations#CatalogueView",
