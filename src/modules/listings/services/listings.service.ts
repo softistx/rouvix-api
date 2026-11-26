@@ -16,7 +16,6 @@ import {
   listingNotFound,
   locked,
 } from "../listings.errors";
-import { contentIssues } from "../listings.rules";
 import {
   addDays,
   CLOSABLE_STATUSES,
@@ -30,6 +29,7 @@ import {
   storedFields,
 } from "../listings.utils";
 import type { CloseReason, ListingKind, listings } from "../models";
+import { contentIssues } from "../rules";
 import type { PhotosService } from "./photos.service";
 
 export type ListingDocument = ReadDocumentOf<typeof listings>;

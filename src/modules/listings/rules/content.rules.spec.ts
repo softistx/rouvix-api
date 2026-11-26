@@ -3,7 +3,7 @@ import {
   type ContentRulesInput,
   contentIssues,
   type RulesLookups,
-} from "./listings.rules";
+} from "./content.rules";
 
 const today = new Date("2026-11-27T00:00:00.000Z");
 const key = (n: number) => `0000000${n}-0000-4000-8000-000000000000`;
